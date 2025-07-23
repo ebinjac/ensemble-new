@@ -186,6 +186,33 @@
   opacity: 1;
 }
 
+.drag-drop-indicator {
+  position: relative;
+  z-index: 10;
+}
+
+.drag-drop-indicator::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px dashed #3b82f6;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.column-drop-zone {
+  transition: all 0.2s ease;
+}
+
+.column-drop-zone:hover {
+  transform: translateY(-1px);
+}
+
 @keyframes dropZonePulse {
   0%, 100% { 
     border-color: #3b82f6; 
@@ -200,3 +227,36 @@
 .drop-zone-active {
   animation: dropZonePulse 2s infinite;
 }
+
+/* Column container constraints */
+.column-container {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.column-flex {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.column-item {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Prevent text overflow in columns */
+.column-item * {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.component-wrapper .component-toolbar { opacity:0; transition:opacity .15s ease; }
+.component-wrapper:hover > .component-toolbar { opacity:1; }
+

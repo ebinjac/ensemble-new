@@ -45,8 +45,14 @@ import {
   ZoomOut,
   RotateCcw,
   Columns2,
-  Columns3
+  Columns3,
+  Tablet,
+  Save,
+  Check,
+  FileText,
+  Layers
 } from 'lucide-react';
+import EnsembleLogo from '../home/logo';
 
 // Enhanced Number Input Component
 interface NumberInputProps {
@@ -280,7 +286,7 @@ function ComponentToolbar({
   onDelete
 }: ComponentToolbarProps) {
   return (
-    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded shadow-lg border p-1 flex space-x-1 z-10">
+    <div className=" component-toolbar absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-card rounded shadow-lg border p-1 flex space-x-1 z-10">
       <Button
         size="sm"
         variant="ghost"
@@ -319,58 +325,223 @@ function ComponentToolbar({
   );
 }
 
-// Preview Modal Component
-interface PreviewModalProps {
+interface EnhancedPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   htmlContent: string;
-  previewMode: 'desktop' | 'mobile';
-  onPreviewModeChange: (mode: 'desktop' | 'mobile') => void;
 }
 
-function PreviewModal({ isOpen, onClose, htmlContent, previewMode, onPreviewModeChange }: PreviewModalProps) {
+function EnhancedPreviewModal({ isOpen, onClose, htmlContent }: EnhancedPreviewModalProps) {
+  const [selectedCategory, setSelectedCategory] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+  const [selectedDevice, setSelectedDevice] = useState(DEFAULT_DEVICES.desktop);
+  const [customWidth, setCustomWidth] = useState('');
+  const [isCustomMode, setIsCustomMode] = useState(false);
+
+  // Update selected device when category changes
+  useEffect(() => {
+    if (!isCustomMode) {
+      setSelectedDevice(DEFAULT_DEVICES[selectedCategory]);
+    }
+  }, [selectedCategory, isCustomMode]);
+
+  const handleDeviceSelect = (device: { name: string; width: number }) => {
+    setSelectedDevice(device);
+    setIsCustomMode(false);
+  };
+
+  const handleCustomWidth = (width: string) => {
+    const widthNum = parseInt(width);
+    if (widthNum >= 200 && widthNum <= 2560) {
+      setCustomWidth(width);
+      setSelectedDevice({ name: 'Custom', width: widthNum });
+      setIsCustomMode(true);
+    }
+  };
+
+  const currentWidth = isCustomMode ? parseInt(customWidth) || 375 : selectedDevice.width;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="min-w-7xl w-[95vw] h-[90vh]">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle>Email Preview</DialogTitle>
-            <div className="flex space-x-2">
-              <Button
-                variant={previewMode === 'desktop' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => onPreviewModeChange('desktop')}
+      <DialogContent className="max-w-[95vw] min-w-[95vw] h-[90vh] p-0 gap-0">
+        {/* Header */}
+        <DialogHeader className="px-6 py-4 border-b bg-card">
+          <div className="flex items-center justify-between px-20">
+            <DialogTitle className="flex items-center space-x-2">
+            </DialogTitle>
+
+            {/* Device Controls */}
+            <div className="flex items-center space-x-4">
+              {/* Category Tabs */}
+              <div className="flex bg-muted rounded-lg p-1">
+                {(['desktop', 'tablet', 'mobile'] as const).map((category) => (
+                  <Button
+                    key={category}
+                    variant={selectedCategory === category ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setSelectedCategory(category)}
+                    className="px-3 py-1 text-xs"
+                  >
+                    {category === 'desktop' && <Monitor className="h-3 w-3 mr-1" />}
+                    {category === 'tablet' && <Tablet className="h-3 w-3 mr-1" />}
+                    {category === 'mobile' && <Smartphone className="h-3 w-3 mr-1" />}
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Device Selector */}
+              <Select
+                value={selectedDevice.name}
+                onValueChange={(value) => {
+                  const allDevices = [
+                    ...DEVICE_PRESETS.desktop,
+                    ...DEVICE_PRESETS.tablet,
+                    ...DEVICE_PRESETS.mobile
+                  ];
+                  const device = allDevices.find(d => d.name === value);
+                  if (device) handleDeviceSelect(device);
+                }}
               >
-                <Monitor className="h-4 w-4 mr-1" />
-                Desktop
-              </Button>
-              <Button
-                variant={previewMode === 'mobile' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => onPreviewModeChange('mobile')}
-              >
-                <Smartphone className="h-4 w-4 mr-1" />
-                Mobile
-              </Button>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEVICE_PRESETS[selectedCategory].map((device) => (
+                    <SelectItem key={device.name} value={device.name}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{device.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          {device.width}px
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Width Display/Custom Input */}
+              <div className="flex items-center space-x-2">
+                <Label className="text-sm text-muted-foreground">Width:</Label>
+                <Input
+                  type="number"
+                  value={isCustomMode ? customWidth : selectedDevice.width}
+                  onChange={(e) => handleCustomWidth(e.target.value)}
+                  className="w-20 h-8 text-xs"
+                  min="200"
+                  max="2560"
+                />
+                <span className="text-xs text-muted-foreground">px</span>
+              </div>
+
+              {/* Zoom Controls */}
+              <div className="flex items-center space-x-1 border rounded">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const newWidth = Math.max(200, currentWidth - 50);
+                    handleCustomWidth(newWidth.toString());
+                  }}
+                  className="h-8 px-2"
+                >
+                  <ZoomOut className="h-3 w-3" />
+                </Button>
+                <div className="px-2 text-xs border-x min-w-[60px] text-center">
+                  {Math.round((currentWidth / 1440) * 100)}%
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const newWidth = Math.min(2560, currentWidth + 50);
+                    handleCustomWidth(newWidth.toString());
+                  }}
+                  className="h-8 px-2"
+                >
+                  <ZoomIn className="h-3 w-3" />
+                </Button>
+              </div>
             </div>
           </div>
         </DialogHeader>
-        <div className="flex-1 bg-gray-100 rounded-md overflow-hidden">
-          <iframe
-            srcDoc={htmlContent}
-            className={`w-full h-full ${previewMode === 'mobile' ? 'max-w-sm mx-auto' : ''}`}
-            style={{
-              width: previewMode === 'mobile' ? '375px' : '100%',
-              height: '100%',
-              border: 'none',
-              margin: previewMode === 'mobile' ? '0 auto' : '0'
-            }}
-          />
+
+        {/* Preview Area */}
+        <div className="flex-1  p-6 overflow-auto">
+          <div className="flex justify-center items-start min-h-full">
+            <div
+              className="bg-white dark:bg-slate-900 rounded-lg shadow-2xl overflow-hidden transition-all duration-300 ease-in-out"
+              style={{
+                width: `${currentWidth}px`,
+                minHeight: '600px',
+                maxWidth: '95%'
+              }}
+            >
+              {/* Device Frame Header */}
+              <div className="bg-gray-100 dark:bg-slate-800 px-4 py-2 border-b flex items-center space-x-2">
+                <div className="flex space-x-1">
+                  <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                  <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                  <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                </div>
+                <div className="flex-1 text-center">
+                  <span className="text-xs text-muted-foreground">
+                    {selectedDevice.name} - {currentWidth}px
+                  </span>
+                </div>
+              </div>
+
+              {/* Email Content */}
+              <div className="relative">
+                <iframe
+                  srcDoc={htmlContent}
+                  className="w-full border-0"
+                  style={{
+                    width: '100%',
+                    height: '800px',
+                    minHeight: '600px'
+                  }}
+                  title="Email Preview"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t bg-card flex items-center justify-between">
+          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+            <div className="flex items-center space-x-1">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span>Live Preview</span>
+            </div>
+            <span>•</span>
+            <span>Viewport: {currentWidth}px</span>
+            <span>•</span>
+            <span>Category: {selectedCategory}</span>
+          </div>
+
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(htmlContent);
+                // You can add a toast notification here
+              }}
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Copy HTML
+            </Button>
+            <Button onClick={onClose}>
+              Close
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
 
 // Enhanced Type Definitions with comprehensive styling
 interface ComponentStyles {
@@ -534,6 +705,8 @@ interface ComponentType {
   category: 'basic' | 'layout';
 }
 
+
+
 // Constants
 const FONT_FAMILIES = [
   { value: 'Arial, sans-serif', label: 'Arial' },
@@ -638,12 +811,1185 @@ const LIST_STYLE_TYPES = {
   ]
 };
 
+const DEVICE_PRESETS = {
+  desktop: [
+    { name: 'MacBook', width: 1152 },
+    { name: 'MacBook Pro', width: 1440 },
+    { name: 'Surface Book', width: 1500 },
+    { name: 'iMac', width: 1280 },
+    { name: 'Desktop HD', width: 1920 },
+    { name: 'Desktop FHD', width: 1080 }
+  ],
+  tablet: [
+    { name: 'iPad Mini', width: 768 },
+    { name: 'iPad Pro 11"', width: 834 },
+    { name: 'iPad Pro 12.9"', width: 1024 },
+    { name: 'Surface Pro 4', width: 1368 },
+    { name: 'Galaxy Tab', width: 800 }
+  ],
+  mobile: [
+    { name: 'iPhone 11 Pro Max', width: 414 },
+    { name: 'iPhone 11 Pro/X', width: 375 },
+    { name: 'Google Pixel 2', width: 411 },
+    { name: 'Android', width: 360 },
+    { name: 'iPhone SE', width: 320 },
+    { name: 'Galaxy S21', width: 384 }
+  ]
+};
+
+const DEFAULT_DEVICES = {
+  desktop: { name: 'MacBook Pro', width: 1440 },
+  tablet: { name: 'iPad Pro 11"', width: 834 },
+  mobile: { name: 'iPhone 11 Pro/X', width: 375 }
+};
+
+
 // Enhanced unique ID generator
 let componentCounter = 0;
 const generateUniqueId = (): string => {
   componentCounter++;
   return `comp-${Date.now()}-${componentCounter}-${Math.random().toString(36).substr(2, 12)}`;
 };
+
+// Pre-built Templates Library
+const TEMPLATE_LIBRARY = {
+  newsletter: {
+    id: 'newsletter-modern',
+    name: 'Modern Newsletter',
+    category: 'Newsletter',
+    thumbnail: 'https://via.placeholder.com/300x400/4F46E5/white?text=Newsletter',
+    description: 'Clean and modern newsletter template with header, content sections, and footer',
+    components: [
+      {
+        id: generateUniqueId(),
+        type: 'container',
+        children: [
+          {
+            id: generateUniqueId(),
+            type: 'heading',
+            content: 'Weekly Newsletter',
+            level: 'h1',
+            styles: {
+              fontSize: '32px',
+              fontWeight: '700',
+              color: '#1a1a1a',
+              textAlign: 'center',
+              paddingTop: '20px',
+              paddingBottom: '10px',
+              backgroundColor: '#f8fafc'
+            }
+          },
+          {
+            id: generateUniqueId(),
+            type: 'text',
+            content: 'Stay updated with our latest news and insights.',
+            styles: {
+              fontSize: '16px',
+              color: '#64748b',
+              textAlign: 'center',
+              paddingBottom: '30px',
+              backgroundColor: '#f8fafc'
+            }
+          }
+        ],
+        styles: { backgroundColor: '#f8fafc', marginBottom: '20px' }
+      },
+      {
+        id: generateUniqueId(),
+        type: 'image',
+        src: 'https://via.placeholder.com/600x300/3B82F6/white?text=Feature+Image',
+        alt: 'Featured content',
+        styles: {
+          width: '100%',
+          maxWidth: '600px',
+          textAlign: 'center',
+          marginBottom: '20px'
+        }
+      },
+      {
+        id: generateUniqueId(),
+        type: 'heading',
+        content: 'This Week\'s Highlights',
+        level: 'h2',
+        styles: {
+          fontSize: '24px',
+          fontWeight: '600',
+          color: '#1e293b',
+          paddingTop: '10px',
+          paddingBottom: '15px'
+        }
+      },
+      {
+        id: generateUniqueId(),
+        type: 'text',
+        content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.',
+        styles: {
+          fontSize: '16px',
+          lineHeight: '1.6',
+          color: '#475569',
+          paddingBottom: '20px'
+        }
+      },
+      {
+        id: generateUniqueId(),
+        type: 'button',
+        text: 'Read More',
+        href: '#',
+        styles: {
+          backgroundColor: '#3b82f6',
+          color: '#ffffff',
+          textAlign: 'center',
+          padding: '12px 30px',
+          borderRadius: '6px',
+          textDecoration: 'none',
+          marginBottom: '30px'
+        }
+      }
+    ],
+    canvasSettings: {
+      backgroundColor: '#ffffff',
+      contentBackgroundColor: '#ffffff',
+      contentWidth: '600px',
+      maxWidth: '600px',
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '16px',
+      lineHeight: '1.5',
+      color: '#333333'
+    }
+  },
+  promotional: {
+    id: 'promo-sale',
+    name: 'Sales Promotion',
+    category: 'Promotional',
+    thumbnail: 'https://via.placeholder.com/300x400/EF4444/white?text=Sale',
+    description: 'Eye-catching promotional email template for sales and offers',
+    components: [
+      {
+        id: generateUniqueId(),
+        type: 'container',
+        children: [
+          {
+            id: generateUniqueId(),
+            type: 'heading',
+            content: '🔥 MEGA SALE',
+            level: 'h1',
+            styles: {
+              fontSize: '36px',
+              fontWeight: '800',
+              color: '#ffffff',
+              textAlign: 'center',
+              paddingTop: '30px',
+              paddingBottom: '10px'
+            }
+          },
+          {
+            id: generateUniqueId(),
+            type: 'heading',
+            content: 'Up to 50% OFF',
+            level: 'h2',
+            styles: {
+              fontSize: '24px',
+              fontWeight: '600',
+              color: '#fef3c7',
+              textAlign: 'center',
+              paddingBottom: '30px'
+            }
+          }
+        ],
+        styles: {
+          backgroundColor: '#ef4444',
+          marginBottom: '0px',
+          borderRadius: '8px 8px 0 0'
+        }
+      },
+      {
+        id: generateUniqueId(),
+        type: 'text',
+        content: 'Don\'t miss out on our biggest sale of the year! Limited time offer on all products.',
+        styles: {
+          fontSize: '18px',
+          textAlign: 'center',
+          paddingTop: '30px',
+          paddingBottom: '20px',
+          color: '#374151',
+          lineHeight: '1.6'
+        }
+      },
+      {
+        id: generateUniqueId(),
+        type: 'button',
+        text: 'SHOP NOW',
+        href: '#',
+        styles: {
+          backgroundColor: '#ef4444',
+          color: '#ffffff',
+          fontSize: '18px',
+          fontWeight: '700',
+          textAlign: 'center',
+          padding: '15px 40px',
+          borderRadius: '8px',
+          marginBottom: '20px'
+        }
+      }
+    ],
+    canvasSettings: {
+      backgroundColor: '#f3f4f6',
+      contentBackgroundColor: '#ffffff',
+      contentWidth: '600px',
+      maxWidth: '600px',
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '16px',
+      lineHeight: '1.5',
+      color: '#333333'
+    }
+  },
+  welcome: {
+    id: 'welcome-onboarding',
+    name: 'Welcome Email',
+    category: 'Onboarding',
+    thumbnail: 'https://via.placeholder.com/300x400/10B981/white?text=Welcome',
+    description: 'Friendly welcome email template for new users',
+    components: [
+      {
+        id: generateUniqueId(),
+        type: 'heading',
+        content: 'Welcome aboard! 👋',
+        level: 'h1',
+        styles: {
+          fontSize: '28px',
+          fontWeight: '700',
+          color: '#059669',
+          textAlign: 'center',
+          paddingTop: '20px',
+          paddingBottom: '20px'
+        }
+      },
+      {
+        id: generateUniqueId(),
+        type: 'text',
+        content: 'We\'re thrilled to have you join our community. Here\'s everything you need to get started on your journey with us.',
+        styles: {
+          fontSize: '16px',
+          lineHeight: '1.6',
+          color: '#374151',
+          textAlign: 'center',
+          paddingBottom: '30px'
+        }
+      },
+      {
+        id: generateUniqueId(),
+        type: 'column',
+        columnWidths: ['50%', '50%'],
+        children: [
+          [
+            {
+              id: generateUniqueId(),
+              type: 'heading',
+              content: '📚 Resources',
+              level: 'h3',
+              styles: { fontSize: '18px', fontWeight: '600', color: '#1f2937', textAlign: 'center', paddingBottom: '10px' }
+            },
+            {
+              id: generateUniqueId(),
+              type: 'text',
+              content: 'Access our comprehensive guide and tutorials.',
+              styles: { fontSize: '14px', color: '#6b7280', textAlign: 'center' }
+            }
+          ],
+          [
+            {
+              id: generateUniqueId(),
+              type: 'heading',
+              content: '💬 Support',
+              level: 'h3',
+              styles: { fontSize: '18px', fontWeight: '600', color: '#1f2937', textAlign: 'center', paddingBottom: '10px' }
+            },
+            {
+              id: generateUniqueId(),
+              type: 'text',
+              content: 'Our team is here to help you 24/7.',
+              styles: { fontSize: '14px', color: '#6b7280', textAlign: 'center' }
+            }
+          ]
+        ],
+        styles: { marginBottom: '30px', gap: '20px' }
+      },
+      {
+        id: generateUniqueId(),
+        type: 'button',
+        text: 'Get Started',
+        href: '#',
+        styles: {
+          backgroundColor: '#059669',
+          color: '#ffffff',
+          textAlign: 'center',
+          padding: '12px 30px',
+          borderRadius: '6px',
+          marginBottom: '20px'
+        }
+      }
+    ],
+    canvasSettings: {
+      backgroundColor: '#f0fdf4',
+      contentBackgroundColor: '#ffffff',
+      contentWidth: '600px',
+      maxWidth: '600px',
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '16px',
+      lineHeight: '1.5',
+      color: '#333333'
+    }
+  }
+};
+
+// Pre-built Component Library
+const COMPONENT_LIBRARY = {
+  headers: [
+    {
+      id: 'header-1',
+      name: 'Simple Header',
+      thumbnail: 'https://via.placeholder.com/200x80/3B82F6/white?text=Header',
+      component: {
+        id: generateUniqueId(),
+        type: 'container',
+        children: [
+          {
+            id: generateUniqueId(),
+            type: 'heading',
+            content: 'Your Company Name',
+            level: 'h1',
+            styles: {
+              fontSize: '24px',
+              fontWeight: '700',
+              color: '#1f2937',
+              textAlign: 'center',
+              paddingTop: '20px',
+              paddingBottom: '20px'
+            }
+          }
+        ],
+        styles: {
+          backgroundColor: '#f8fafc',
+          borderBottom: '2px solid #e5e7eb',
+          marginBottom: '20px'
+        }
+      }
+    },
+    {
+      id: 'header-2',
+      name: 'Logo Header',
+      thumbnail: 'https://via.placeholder.com/200x80/1F2937/white?text=Logo',
+      component: {
+        id: generateUniqueId(),
+        type: 'container',
+        children: [
+          {
+            id: generateUniqueId(),
+            type: 'image',
+            src: 'https://via.placeholder.com/200x60/3B82F6/white?text=LOGO',
+            alt: 'Company Logo',
+            styles: {
+              width: '200px',
+              height: 'auto',
+              textAlign: 'center',
+              paddingTop: '20px',
+              paddingBottom: '20px'
+            }
+          }
+        ],
+        styles: {
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #e5e7eb',
+          marginBottom: '20px'
+        }
+      }
+    }
+  ],
+  cta: [
+    {
+      id: 'cta-1',
+      name: 'Primary CTA',
+      thumbnail: 'https://via.placeholder.com/200x100/3B82F6/white?text=CTA',
+      component: {
+        id: generateUniqueId(),
+        type: 'container',
+        children: [
+          {
+            id: generateUniqueId(),
+            type: 'heading',
+            content: 'Ready to get started?',
+            level: 'h2',
+            styles: {
+              fontSize: '24px',
+              fontWeight: '600',
+              color: '#1f2937',
+              textAlign: 'center',
+              paddingBottom: '15px'
+            }
+          },
+          {
+            id: generateUniqueId(),
+            type: 'text',
+            content: 'Join thousands of satisfied customers today.',
+            styles: {
+              fontSize: '16px',
+              color: '#6b7280',
+              textAlign: 'center',
+              paddingBottom: '20px'
+            }
+          },
+          {
+            id: generateUniqueId(),
+            type: 'button',
+            text: 'Get Started Now',
+            href: '#',
+            styles: {
+              backgroundColor: '#3b82f6',
+              color: '#ffffff',
+              fontSize: '16px',
+              fontWeight: '600',
+              textAlign: 'center',
+              padding: '12px 30px',
+              borderRadius: '6px'
+            }
+          }
+        ],
+        styles: {
+          backgroundColor: '#f8fafc',
+          paddingTop: '30px',
+          paddingBottom: '30px',
+          paddingLeft: '20px',
+          paddingRight: '20px',
+          borderRadius: '8px',
+          marginBottom: '20px'
+        }
+      }
+    },
+    {
+      id: 'cta-2',
+      name: 'Urgent CTA',
+      thumbnail: 'https://via.placeholder.com/200x100/EF4444/white?text=Urgent',
+      component: {
+        id: generateUniqueId(),
+        type: 'container',
+        children: [
+          {
+            id: generateUniqueId(),
+            type: 'heading',
+            content: '⏰ Limited Time Offer!',
+            level: 'h2',
+            styles: {
+              fontSize: '22px',
+              fontWeight: '700',
+              color: '#dc2626',
+              textAlign: 'center',
+              paddingBottom: '10px'
+            }
+          },
+          {
+            id: generateUniqueId(),
+            type: 'text',
+            content: 'Don\'t miss out - offer expires soon!',
+            styles: {
+              fontSize: '16px',
+              color: '#374151',
+              textAlign: 'center',
+              paddingBottom: '20px'
+            }
+          },
+          {
+            id: generateUniqueId(),
+            type: 'button',
+            text: 'Claim Offer',
+            href: '#',
+            styles: {
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              fontSize: '16px',
+              fontWeight: '700',
+              textAlign: 'center',
+              padding: '14px 35px',
+              borderRadius: '6px'
+            }
+          }
+        ],
+        styles: {
+          backgroundColor: '#fef2f2',
+          paddingTop: '25px',
+          paddingBottom: '25px',
+          paddingLeft: '20px',
+          paddingRight: '20px',
+          borderRadius: '8px',
+          border: '2px solid #fecaca',
+          marginBottom: '20px'
+        }
+      }
+    }
+  ],
+  footers: [
+    {
+      id: 'footer-1',
+      name: 'Simple Footer',
+      thumbnail: 'https://via.placeholder.com/200x80/6B7280/white?text=Footer',
+      component: {
+        id: generateUniqueId(),
+        type: 'container',
+        children: [
+          {
+            id: generateUniqueId(),
+            type: 'divider',
+            styles: {
+              backgroundColor: '#e5e7eb',
+              height: '1px',
+              marginBottom: '20px'
+            }
+          },
+          {
+            id: generateUniqueId(),
+            type: 'text',
+            content: '© 2024 Your Company Name. All rights reserved.',
+            styles: {
+              fontSize: '14px',
+              color: '#6b7280',
+              textAlign: 'center',
+              paddingBottom: '10px'
+            }
+          },
+          {
+            id: generateUniqueId(),
+            type: 'text',
+            content: 'Unsubscribe | Update Preferences | Privacy Policy',
+            styles: {
+              fontSize: '12px',
+              color: '#9ca3af',
+              textAlign: 'center'
+            }
+          }
+        ],
+        styles: {
+          backgroundColor: '#f9fafb',
+          paddingTop: '20px',
+          paddingBottom: '20px',
+          paddingLeft: '20px',
+          paddingRight: '20px'
+        }
+      }
+    }
+  ]
+};
+
+interface TemplateLibraryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectTemplate: (template: any) => void;
+  onSelectComponent: (component: any) => void;
+}
+
+function TemplateLibraryModal({ isOpen, onClose, onSelectTemplate, onSelectComponent }: TemplateLibraryModalProps) {
+  const [activeTab, setActiveTab] = useState<'templates' | 'components'>('templates');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [previewTemplate, setPreviewTemplate] = useState<any>(null);
+
+  const templateCategories = ['all', ...Array.from(new Set(Object.values(TEMPLATE_LIBRARY).map(t => t.category)))];
+  const componentCategories = ['headers', 'cta', 'footers'];
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl min-w-[90vw] h-[80vh] p-0 gap-0">
+        {/* Header */}
+        <DialogHeader className="px-6 py-4 border-b bg-card">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center space-x-2">
+              <Layout className="h-5 w-5" />
+              <span>Template & Component Library</span>
+            </DialogTitle>
+
+            {/* Tab Switcher */}
+            <div className="flex bg-muted rounded-lg p-1">
+              <Button
+                variant={activeTab === 'templates' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveTab('templates')}
+                className="px-4"
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                Templates
+              </Button>
+              <Button
+                variant={activeTab === 'components' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveTab('components')}
+                className="px-4"
+              >
+                <Layers className="h-4 w-4 mr-1" />
+                Components
+              </Button>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar */}
+          <div className="w-48 border-r bg-card p-4">
+            <Label className="text-sm font-medium text-muted-foreground mb-2 block">
+              {activeTab === 'templates' ? 'Categories' : 'Sections'}
+            </Label>
+            <div className="space-y-1">
+              {(activeTab === 'templates' ? templateCategories : componentCategories).map((category) => (
+                <Button
+                  key={category}
+                  variant={selectedCategory === category ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSelectedCategory(category)}
+                  className="w-full justify-start text-left"
+                >
+                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Content Area */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            {activeTab === 'templates' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Object.values(TEMPLATE_LIBRARY)
+                  .filter(template => selectedCategory === 'all' || template.category === selectedCategory)
+                  .map((template) => (
+                    <div
+                      key={template.id}
+                      className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group bg-white"
+                      onClick={() => {
+                        onSelectTemplate(template);
+                        onClose();
+                      }}
+                    >
+                      {/* Replace the placeholder image with actual preview */}
+                      <div className="aspect-[3/4] relative overflow-hidden bg-gray-50">
+                        <TemplatePreviewRenderer
+                          template={template}
+                          className="w-full h-full"
+                        />
+                        <div className=" bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button size="sm" className="bg-white text-black hover:bg-gray-100">
+                              Use Template
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <h3 className="font-semibold text-sm mb-1">{template.name}</h3>
+                        <p className="text-xs text-muted-foreground mb-2">{template.description}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                            {template.category}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Open preview in new modal or expand current preview
+                              setPreviewTemplate(template);
+                            }}
+                          >
+                            Preview
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {componentCategories
+                  .filter(category => selectedCategory === category || selectedCategory === 'all')
+                  .map((category) => (
+                    <div key={category}>
+                      <h3 className="text-lg font-semibold mb-4 capitalize">{category}</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {COMPONENT_LIBRARY[category as keyof typeof COMPONENT_LIBRARY]?.map((comp) => (
+                          <div
+                            key={comp.id}
+                            className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('prebuiltComponent', JSON.stringify(comp.component));
+                            }}
+                            onClick={() => {
+                              onSelectComponent(comp.component);
+                              onClose();
+                            }}
+                          >
+                            <div className="aspect-[5/2] relative overflow-hidden bg-gray-50">
+                              <ComponentPreviewRenderer
+                                component={comp.component}
+                                width={200}
+                                height={80}
+                              />
+                              <div className="absolute inset-0 bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs bg-white px-2 py-1 rounded shadow">
+                                  Drag or Click
+                                </div>
+                              </div>
+                            </div>
+                            <div className="p-3">
+                              <h4 className="font-medium text-sm">{comp.name}</h4>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+      {previewTemplate && (
+        <Dialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
+          <DialogContent className="max-w-4xl min-w-[90vw] max-h-[80vh] p-0 gap-0">
+            <DialogHeader className="px-6 py-4 border-b">
+              <div className="flex items-center justify-between">
+                <DialogTitle>{previewTemplate.name} Preview</DialogTitle>
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={() => {
+                      onSelectTemplate(previewTemplate);
+                      setPreviewTemplate(null);
+                      onClose();
+                    }}
+                  >
+                    Use This Template
+                  </Button>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="flex-1 bg-gradient-to-br from-slate-100 to-slate-200 p-6 overflow-auto">
+              <div className="flex justify-center">
+                <div className="bg-white rounded-lg shadow-lg" style={{ width: '600px', height: '800px' }}>
+                  <TemplatePreviewRenderer
+                    template={previewTemplate}
+                    width={600}
+                    height={800}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </Dialog>
+  );
+}
+
+interface TemplatePreviewProps {
+  template: any;
+  width?: number;
+  height?: number;
+  className?: string;
+}
+
+function TemplatePreviewRenderer({ template , className = "" }: TemplatePreviewProps) {
+  const [previewHtml, setPreviewHtml] = useState<string>('');
+
+
+  // Improved stylesToString function
+  const stylesToString = (styles?: any): string => {
+    if (!styles) return '';
+
+    return Object.entries(styles)
+      .filter(([_, value]) => {
+        return value !== undefined &&
+          value !== '' &&
+          value !== 'transparent' &&
+          value !== 'none' &&
+          value !== null &&
+          value !== '0px'
+      })
+      .map(([key, value]) => {
+        const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+        return `${cssProperty}: ${value}`;
+      })
+      .join('; ');
+  };
+
+  // Generate HTML for template preview
+  useEffect(() => {
+    const generatePreviewHTML = (components: EmailComponent[], canvasSettings: CanvasSettings) => {
+      const renderComponent = (component: EmailComponent): string => {
+        try {
+          switch (component.type) {
+            case 'text':
+              const textComp = component as TextComponent;
+              const textContainerStyles = {
+                backgroundColor: textComp.styles?.backgroundColor || 'transparent',
+                padding: `${textComp.styles?.paddingTop || '8px'} ${textComp.styles?.paddingRight || '8px'} ${textComp.styles?.paddingBottom || '8px'} ${textComp.styles?.paddingLeft || '8px'}`,
+                margin: `${textComp.styles?.marginTop || '0px'} ${textComp.styles?.marginRight || '0px'} ${textComp.styles?.marginBottom || '8px'} ${textComp.styles?.marginLeft || '0px'}`,
+                borderRadius: textComp.styles?.borderRadius || '0px',
+                textAlign: textComp.styles?.textAlign || 'left',
+                border: textComp.styles?.borderWidth && textComp.styles?.borderWidth !== '0px'
+                  ? `${textComp.styles.borderWidth} ${textComp.styles?.borderStyle || 'solid'} ${textComp.styles?.borderColor || '#cccccc'}`
+                  : 'none',
+                boxShadow: textComp.styles?.boxShadow || 'none'
+              };
+
+              const textStyles = {
+                fontSize: textComp.styles?.fontSize || '14px', // Slightly smaller for preview
+                fontFamily: textComp.styles?.fontFamily || 'Arial, sans-serif',
+                fontWeight: textComp.styles?.fontWeight || '400',
+                color: textComp.styles?.color || '#333333',
+                lineHeight: textComp.styles?.lineHeight || '1.4',
+                textAlign: 'inherit',
+                margin: '0',
+                padding: '0'
+              };
+
+              return `<div style="${stylesToString(textContainerStyles)}">
+                <p style="${stylesToString(textStyles)}">${textComp.content || 'Sample text'}</p>
+              </div>`;
+
+            case 'heading':
+              const headingComp = component as HeadingComponent;
+              const headingContainerStyles = {
+                backgroundColor: headingComp.styles?.backgroundColor || 'transparent',
+                padding: `${headingComp.styles?.paddingTop || '8px'} ${headingComp.styles?.paddingRight || '8px'} ${headingComp.styles?.paddingBottom || '8px'} ${headingComp.styles?.paddingLeft || '8px'}`,
+                margin: `${headingComp.styles?.marginTop || '0px'} ${headingComp.styles?.marginRight || '0px'} ${headingComp.styles?.marginBottom || '8px'} ${headingComp.styles?.marginLeft || '0px'}`,
+                borderRadius: headingComp.styles?.borderRadius || '0px',
+                textAlign: headingComp.styles?.textAlign || 'left',
+                border: headingComp.styles?.borderWidth && headingComp.styles?.borderWidth !== '0px'
+                  ? `${headingComp.styles.borderWidth} ${headingComp.styles?.borderStyle || 'solid'} ${headingComp.styles?.borderColor || '#cccccc'}`
+                  : 'none'
+              };
+
+              const headingTextStyles = {
+                fontSize: headingComp.styles?.fontSize ? `${Math.max(16, parseInt(headingComp.styles.fontSize) * 0.8)}px` : '20px', // Scale down but keep readable
+                fontFamily: headingComp.styles?.fontFamily || 'Arial, sans-serif',
+                fontWeight: headingComp.styles?.fontWeight || '700',
+                color: headingComp.styles?.color || '#1a1a1a',
+                lineHeight: headingComp.styles?.lineHeight || '1.2',
+                textAlign: 'inherit',
+                margin: '0',
+                padding: '0'
+              };
+
+              return `<div style="${stylesToString(headingContainerStyles)}">
+                <${headingComp.level} style="${stylesToString(headingTextStyles)}">${headingComp.content || 'Sample Heading'}</${headingComp.level}>
+              </div>`;
+
+            case 'image':
+              const imageComp = component as ImageComponent;
+              const imageContainerStyles = {
+                textAlign: imageComp.styles?.textAlign || 'left',
+                marginBottom: '8px',
+                backgroundColor: imageComp.styles?.backgroundColor || 'transparent',
+                padding: imageComp.styles?.padding || '0px'
+              };
+
+              const imageStyles = {
+                width: imageComp.styles?.width || '100%',
+                maxWidth: '100%',
+                height: 'auto',
+                display: 'block',
+                borderRadius: imageComp.styles?.borderRadius || '0px'
+              };
+
+              return `<div style="${stylesToString(imageContainerStyles)}">
+                <img src="${imageComp.src || 'https://via.placeholder.com/300x150/e2e8f0/64748b?text=Image'}" alt="${imageComp.alt || 'Sample Image'}" style="${stylesToString(imageStyles)}" />
+              </div>`;
+
+            case 'button':
+              const buttonComp = component as ButtonComponent;
+              const buttonContainerStyles = {
+                textAlign: buttonComp.styles?.textAlign || 'left',
+                marginBottom: '8px'
+              };
+
+              const buttonStyles = {
+                backgroundColor: buttonComp.styles?.backgroundColor || '#3b82f6',
+                color: buttonComp.styles?.color || '#ffffff',
+                fontSize: '12px', // Fixed smaller size for preview
+                fontFamily: buttonComp.styles?.fontFamily || 'Arial, sans-serif',
+                fontWeight: buttonComp.styles?.fontWeight || '500',
+                textDecoration: 'none',
+                display: 'inline-block',
+                padding: '8px 16px', // Smaller padding for preview
+                borderRadius: buttonComp.styles?.borderRadius || '4px',
+                border: 'none',
+                cursor: 'pointer'
+              };
+
+              return `<div style="${stylesToString(buttonContainerStyles)}">
+                <a href="#" style="${stylesToString(buttonStyles)}">${buttonComp.text || 'Click Here'}</a>
+              </div>`;
+
+            case 'divider':
+              const dividerStyles = {
+                height: component.styles?.height || '1px',
+                backgroundColor: component.styles?.backgroundColor || '#e2e8f0',
+                border: 'none',
+                margin: '8px 0',
+                width: '100%'
+              };
+              return `<hr style="${stylesToString(dividerStyles)}" />`;
+
+            case 'spacer':
+              const spacerComp = component as SpacerComponent;
+              const spacerHeight = Math.max(4, parseInt(spacerComp.height || '16') / 2); // Reduce spacer height for preview
+              return `<div style="height: ${spacerHeight}px; line-height: ${spacerHeight}px;"></div>`;
+
+            case 'list':
+              const listComp = component as ListComponent;
+              const listStyles = {
+                fontSize: '12px', // Smaller for preview
+                fontFamily: listComp.styles?.fontFamily || 'Arial, sans-serif',
+                color: listComp.styles?.color || '#333333',
+                lineHeight: '1.4',
+                listStyleType: listComp.styles?.listStyleType || (listComp.listType === 'ol' ? 'decimal' : 'disc'),
+                paddingLeft: '16px',
+                margin: '0 0 8px 0'
+              };
+
+              const listItems = (listComp.items || ['Sample item 1', 'Sample item 2']).map(item => `<li>${item}</li>`).join('');
+              return `<${listComp.listType || 'ul'} style="${stylesToString(listStyles)}">${listItems}</${listComp.listType || 'ul'}>`;
+
+            case 'container':
+              const containerComp = component as ContainerComponent;
+              const containerStyles = {
+                backgroundColor: containerComp.styles?.backgroundColor || 'transparent',
+                padding: '8px', // Reduced padding for preview
+                borderRadius: containerComp.styles?.borderRadius || '0px',
+                border: containerComp.styles?.borderWidth && containerComp.styles?.borderWidth !== '0px'
+                  ? `1px ${containerComp.styles?.borderStyle || 'solid'} ${containerComp.styles?.borderColor || '#e2e8f0'}`
+                  : 'none',
+                marginBottom: '8px'
+              };
+
+              const childrenHtml = (containerComp.children || []).map(renderComponent).join('');
+              return `<div style="${stylesToString(containerStyles)}">${childrenHtml}</div>`;
+
+            case 'column':
+              const columnComp = component as ColumnComponent;
+              const columnWidths = columnComp.columnWidths || ['50%', '50%'];
+
+              return `<table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;" cellspacing="0" cellpadding="0">
+                <tr>
+                  ${columnWidths.map((width, index) => {
+                const columnContent = Array.isArray(columnComp.children?.[index])
+                  ? columnComp.children[index].map(renderComponent).join('')
+                  : '<div style="color: #9ca3af; text-align: center; padding: 8px; border: 1px dashed #e2e8f0; font-size: 10px;">Column</div>';
+                return `<td style="width: ${width}; vertical-align: top; padding: 2px;">${columnContent}</td>`;
+              }).join('')}
+                </tr>
+              </table>`;
+
+            default:
+              return `<div style="color: #9ca3af; padding: 4px; border: 1px dashed #e2e8f0; font-size: 10px;">Unknown: ${component.type}</div>`;
+          }
+        } catch (error) {
+          console.error('Error rendering component:', component.type, error);
+          return `<div style="color: red; padding: 4px; font-size: 10px;">Error: ${component.type}</div>`;
+        }
+      };
+
+      const componentHTML = components.map(renderComponent).join('');
+
+      return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { 
+      margin: 0; 
+      padding: 12px; 
+      font-family: ${canvasSettings.fontFamily || 'Arial, sans-serif'}; 
+      background-color: ${canvasSettings.backgroundColor || '#ffffff'};
+      font-size: 12px;
+      line-height: 1.4;
+      color: ${canvasSettings.color || '#333333'};
+    }
+    * { 
+      box-sizing: border-box; 
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    table {
+      border-collapse: collapse;
+    }
+  </style>
+</head>
+<body>
+  <div style="background-color: ${canvasSettings.contentBackgroundColor || '#ffffff'}; max-width: 100%; margin: 0 auto; padding: 8px;">
+    ${componentHTML}
+  </div>
+</body>
+</html>`.trim();
+    };
+
+    if (template && template.components) {
+      const html = generatePreviewHTML(template.components, template.canvasSettings);
+      setPreviewHtml(html);
+    }
+  }, [template]);
+
+  if (!previewHtml) {
+    return (
+      <div
+        className={`bg-gray-100 rounded-lg overflow-hidden shadow-sm ${className} flex items-center justify-center`}
+      >
+        <div className="text-gray-500 text-sm">Loading preview...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`bg-white rounded-lg overflow-hidden shadow-sm ${className}`}
+    >
+      <iframe
+        srcDoc={previewHtml}
+        className="w-full h-full border-0 pointer-events-none"
+        style={{
+          width: '100%',
+          height: '800px',
+          minHeight: '600px'
+        }}
+        title="Component Preview"
+      />
+
+    </div>
+  );
+}
+
+
+
+interface ComponentPreviewProps {
+  component: any;
+  width?: number;
+  height?: number;
+}
+
+function ComponentPreviewRenderer({ component, width = 200, height = 80 }: ComponentPreviewProps) {
+  const [previewHtml, setPreviewHtml] = useState<string>('');
+
+  useEffect(() => {
+    const generateComponentHTML = (comp: any): string => {
+      let content = '';
+
+      switch (comp.type) {
+        case 'container':
+          if (comp.children && comp.children.length > 0) {
+            const childContent = comp.children.map((child: any) => {
+              if (child.type === 'heading') {
+                return `<h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 16px;">${child.content || 'Sample Heading'}</h3>`;
+              } else if (child.type === 'text') {
+                return `<p style="margin: 0; color: #4b5563; font-size: 14px;">${child.content || 'Sample text content'}</p>`;
+              } else if (child.type === 'button') {
+                return `<a href="#" style="background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; display: inline-block; font-size: 12px;">${child.text || 'Button'}</a>`;
+              }
+              return '';
+            }).join('');
+            content = childContent;
+          } else {
+            content = '<div style="border: 2px dashed #d1d5db; padding: 10px; text-align: center; color: #6b7280; font-size: 12px;">Container Section</div>';
+          }
+          break;
+
+        case 'heading':
+          content = `<h2 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">${comp.content || comp.children?.[0]?.content || 'Sample Heading'}</h2>`;
+          break;
+
+        case 'text':
+          content = `<p style="margin: 0; color: #4b5563; font-size: 14px; line-height: 1.4;">${comp.content || 'Sample text content goes here'}</p>`;
+          break;
+
+        case 'button':
+          content = `<a href="#" style="background: #3b82f6; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; font-size: 14px;">${comp.text || 'Button'}</a>`;
+          break;
+
+        case 'image':
+          content = `<img src="https://via.placeholder.com/120x60/e5e7eb/9ca3af?text=Image" alt="Preview" style="max-width: 100%; height: auto; border-radius: 4px;" />`;
+          break;
+
+        case 'divider':
+          content = `<hr style="border: none; height: 1px; background: #d1d5db; margin: 10px 0;" />`;
+          break;
+
+        default:
+          content = `<div style="padding: 8px; background: #f3f4f6; border-radius: 4px; color: #6b7280; font-size: 12px; text-align: center;">${comp.name || comp.type || 'Component'}</div>`;
+      }
+
+      const basicHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { 
+      margin: 0; 
+      padding: 8px; 
+      font-family: Arial, sans-serif; 
+      background: #f8fafc;
+      overflow: hidden;
+    }
+    * { 
+      box-sizing: border-box; 
+    }
+  </style>
+</head>
+<body>
+  <div style="background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 100%; overflow: hidden;">
+    ${content}
+  </div>
+</body>
+</html>`;
+      return basicHtml;
+    };
+
+    if (component) {
+      setPreviewHtml(generateComponentHTML(component));
+    }
+  }, [component]);
+
+  if (!previewHtml) {
+    return (
+      <div
+        style={{ width, height }}
+        className="bg-gray-100 rounded flex items-center justify-center"
+      >
+        <span className="text-gray-500 text-xs">Loading...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width, height }} className="overflow-hidden rounded">
+      <iframe
+        srcDoc={previewHtml}
+        className="w-full h-full border-0 pointer-events-none"
+        style={{
+          width: '100%',
+        }}
+        title="Template Preview"
+      />
+    </div>
+  );
+}
+
+
+
+
+
 
 // Enhanced Component Types with comprehensive default styles
 const COMPONENT_TYPES: Record<string, ComponentType> = {
@@ -771,8 +2117,11 @@ const COMPONENT_TYPES: Record<string, ComponentType> = {
         display: 'inline-block',
         cursor: 'pointer',
         transition: 'all 0.3s ease',
-        marginBottom: '0px',
         opacity: '1',
+        marginTop: '10px',
+        marginRight: '10px',
+        marginBottom: '10px',
+        marginLeft: '10px',
         textTransform: 'none',
         boxShadow: 'none',
       }
@@ -1108,6 +2457,72 @@ export default function EmailEditor({
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
   const [draggedComponentType, setDraggedComponentType] = useState<string | null>(null);
 
+  // Add to state declarations
+  const [isTemplateLibraryOpen, setIsTemplateLibraryOpen] = useState(false);
+
+  // Save template functionality
+  const handleSave = useCallback(() => {
+    if (!onSave) return;
+
+    const template: EmailTemplate = {
+      id: initialTemplate?.id || generateUniqueId(),
+      name: initialTemplate?.name || `Email Template ${new Date().toLocaleDateString()}`,
+      components: components,
+      canvasSettings: canvasSettings
+    };
+
+    console.log('Saving template:', template); // Debug log
+    onSave(template);
+  }, [components, canvasSettings, onSave, initialTemplate]);
+
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) {
+      return 'just now';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes}m ago`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours}h ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  // Auto-save functionality (optional)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Track changes for unsaved indicator
+  useEffect(() => {
+    setHasUnsavedChanges(true);
+  }, [components, canvasSettings]);
+
+  // Auto-save every 30 seconds if there are unsaved changes
+  useEffect(() => {
+    if (!hasUnsavedChanges || !onSave || readOnly) return;
+
+    const autoSaveInterval = setInterval(() => {
+      handleSave();
+      setHasUnsavedChanges(false);
+      setLastSaved(new Date());
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [hasUnsavedChanges, handleSave, onSave, readOnly]);
+
+  // Manual save handler with feedback
+  const handleManualSave = useCallback(() => {
+    handleSave();
+    setHasUnsavedChanges(false);
+    setLastSaved(new Date());
+
+    // You can add toast notification here
+    console.log('Template saved successfully!');
+  }, [handleSave]);
 
 
   // Zoom controls
@@ -1122,6 +2537,8 @@ export default function EmailEditor({
   const handleZoomReset = () => {
     setZoomLevel(100);
   };
+
+
 
   // Save state for undo/redo
   const saveState = useCallback(() => {
@@ -1505,6 +2922,40 @@ export default function EmailEditor({
     }));
   }, [saveState]);
 
+  // Add template selection function
+  const handleSelectTemplate = useCallback((template: any) => {
+    // Save current state for undo
+    saveState();
+
+    // Replace current template
+    setComponents(template.components.map((comp: any) => ({
+      ...comp,
+      id: generateUniqueId() // Generate new IDs to avoid conflicts
+    })));
+    setCanvasSettings(template.canvasSettings);
+    setSelectedComponent(null);
+
+    console.log('Template loaded:', template.name);
+  }, [saveState]);
+
+  // Add component selection function
+  const handleSelectComponent = useCallback((component: any) => {
+    // Add the component with a new ID
+    const newComponent = {
+      ...component,
+      id: generateUniqueId()
+    };
+
+    saveState();
+    addComponentToCanvas(newComponent);
+  }, [saveState]);
+
+  // Helper function to add component to canvas
+  const addComponentToCanvas = (component: EmailComponent) => {
+    setComponents(prev => [...prev, component]);
+  };
+
+
 
 
   // Enhanced HTML generation with proper column handling
@@ -1513,10 +2964,91 @@ export default function EmailEditor({
       switch (component.type) {
         case 'text':
           const textComp = component as TextComponent;
-          return `<p style="${stylesToString(textComp.styles)}">${textComp.content}</p>`;
+
+          // Container styles (background, padding, margins, borders)
+          const TextContainerStyles = {
+            backgroundColor: textComp.styles?.backgroundColor,
+            paddingTop: textComp.styles?.paddingTop,
+            paddingRight: textComp.styles?.paddingRight,
+            paddingBottom: textComp.styles?.paddingBottom,
+            paddingLeft: textComp.styles?.paddingLeft,
+            marginTop: textComp.styles?.marginTop,
+            marginRight: textComp.styles?.marginRight,
+            marginBottom: textComp.styles?.marginBottom,
+            marginLeft: textComp.styles?.marginLeft,
+            border: textComp.styles?.border,
+            borderWidth: textComp.styles?.borderWidth,
+            borderStyle: textComp.styles?.borderStyle,
+            borderColor: textComp.styles?.borderColor,
+            borderRadius: textComp.styles?.borderRadius,
+            boxShadow: textComp.styles?.boxShadow,
+            opacity: textComp.styles?.opacity,
+            textAlign: textComp.styles?.textAlign || 'left'
+          };
+
+          // Text-specific styles for the paragraph element
+          const textStyles = {
+            fontSize: textComp.styles?.fontSize,
+            fontFamily: textComp.styles?.fontFamily,
+            fontWeight: textComp.styles?.fontWeight,
+            fontStyle: textComp.styles?.fontStyle,
+            lineHeight: textComp.styles?.lineHeight,
+            color: textComp.styles?.color,
+            textDecoration: textComp.styles?.textDecoration,
+            textTransform: textComp.styles?.textTransform,
+            letterSpacing: textComp.styles?.letterSpacing,
+            textAlign: 'inherit',
+            margin: '0',
+            padding: '0'
+          };
+
+          return `<div style="${stylesToString(TextContainerStyles)}">
+    <p style="${stylesToString(textStyles)}">${textComp.content}</p>
+  </div>`;
+
         case 'heading':
           const headingComp = component as HeadingComponent;
-          return `<${headingComp.level} style="${stylesToString(headingComp.styles)}">${headingComp.content}</${headingComp.level}>`;
+
+          // Separate container styles (background, padding, margins, borders) from text styles
+          const HeadingContainerStyles = {
+            backgroundColor: headingComp.styles?.backgroundColor,
+            paddingTop: headingComp.styles?.paddingTop,
+            paddingRight: headingComp.styles?.paddingRight,
+            paddingBottom: headingComp.styles?.paddingBottom,
+            paddingLeft: headingComp.styles?.paddingLeft,
+            marginTop: headingComp.styles?.marginTop,
+            marginRight: headingComp.styles?.marginRight,
+            marginBottom: headingComp.styles?.marginBottom,
+            marginLeft: headingComp.styles?.marginLeft,
+            border: headingComp.styles?.border,
+            borderWidth: headingComp.styles?.borderWidth,
+            borderStyle: headingComp.styles?.borderStyle,
+            borderColor: headingComp.styles?.borderColor,
+            borderRadius: headingComp.styles?.borderRadius,
+            boxShadow: headingComp.styles?.boxShadow,
+            opacity: headingComp.styles?.opacity,
+            textAlign: headingComp.styles?.textAlign || 'left'
+          };
+
+          // Text-specific styles for the heading element itself
+          const headingStyles = {
+            fontSize: headingComp.styles?.fontSize,
+            fontFamily: headingComp.styles?.fontFamily,
+            fontWeight: headingComp.styles?.fontWeight,
+            fontStyle: headingComp.styles?.fontStyle,
+            lineHeight: headingComp.styles?.lineHeight,
+            color: headingComp.styles?.color,
+            textDecoration: headingComp.styles?.textDecoration,
+            textTransform: headingComp.styles?.textTransform,
+            letterSpacing: headingComp.styles?.letterSpacing,
+            textAlign: 'inherit',
+            margin: '0',
+            padding: '0'
+          };
+
+          return `<div style="${stylesToString(HeadingContainerStyles)}">
+              <${headingComp.level} style="${stylesToString(headingStyles)}">${headingComp.content}</${headingComp.level}>
+            </div>`;
         case 'image':
           const imageComp = component as ImageComponent;
           const imageStyles = { ...imageComp.styles };
@@ -1545,10 +3077,48 @@ export default function EmailEditor({
               </div>`;
         case 'button':
           const buttonComp = component as ButtonComponent;
-          const buttonStyles = { ...buttonComp.styles };
-          const alignment = buttonStyles.textAlign || 'left';
-          delete buttonStyles.textAlign; // Remove textAlign from button styles
-          return `<div style="text-align: ${alignment}; margin-bottom: ${buttonStyles.marginBottom || '0px'}"><a href="${buttonComp.href}" style="${stylesToString(buttonStyles)}">${buttonComp.text}</a></div>`;
+
+          // Container styles for layout
+          const ButtonContainerStyles = {
+            textAlign: buttonComp.styles?.textAlign || 'left',
+            marginTop: buttonComp.styles?.marginTop,
+            marginRight: buttonComp.styles?.marginRight,
+            marginBottom: buttonComp.styles?.marginBottom,
+            marginLeft: buttonComp.styles?.marginLeft,
+            paddingTop: buttonComp.styles?.paddingTop,
+            paddingRight: buttonComp.styles?.paddingRight,
+            paddingBottom: buttonComp.styles?.paddingBottom,
+            paddingLeft: buttonComp.styles?.paddingLeft
+          };
+
+          // Button-specific styles
+          const buttonStyles = {
+            backgroundColor: buttonComp.styles?.backgroundColor,
+            color: buttonComp.styles?.color,
+            fontSize: buttonComp.styles?.fontSize,
+            fontFamily: buttonComp.styles?.fontFamily,
+            fontWeight: buttonComp.styles?.fontWeight,
+            fontStyle: buttonComp.styles?.fontStyle,
+            textDecoration: 'none',
+            display: 'inline-block',
+            padding: buttonComp.styles?.padding || '12px 24px', // Use component padding or default
+            borderRadius: buttonComp.styles?.borderRadius,
+            border: buttonComp.styles?.border,
+            borderWidth: buttonComp.styles?.borderWidth,
+            borderStyle: buttonComp.styles?.borderStyle,
+            borderColor: buttonComp.styles?.borderColor,
+            boxShadow: buttonComp.styles?.boxShadow,
+            opacity: buttonComp.styles?.opacity,
+            cursor: 'pointer',
+            textTransform: buttonComp.styles?.textTransform,
+            letterSpacing: buttonComp.styles?.letterSpacing,
+            lineHeight: buttonComp.styles?.lineHeight
+          };
+
+          return `<div style="${stylesToString(ButtonContainerStyles)}">
+                  <a href="${buttonComp.href}" style="${stylesToString(buttonStyles)}">${buttonComp.text}</a>
+                </div>`;
+
         case 'divider':
           return `<hr style="${stylesToString(component.styles)}" />`;
         case 'spacer':
@@ -1556,12 +3126,46 @@ export default function EmailEditor({
           return `<div style="height: ${spacerComp.height}; line-height: ${spacerComp.height};"></div>`;
         case 'list':
           const listComp = component as ListComponent;
+
+          // Container styles
+          const ListContainerStyles = {
+            backgroundColor: listComp.styles?.backgroundColor,
+            paddingTop: listComp.styles?.paddingTop,
+            paddingRight: listComp.styles?.paddingRight,
+            paddingBottom: listComp.styles?.paddingBottom,
+            paddingLeft: listComp.styles?.paddingLeft,
+            marginTop: listComp.styles?.marginTop,
+            marginRight: listComp.styles?.marginRight,
+            marginBottom: listComp.styles?.marginBottom,
+            marginLeft: listComp.styles?.marginLeft,
+            border: listComp.styles?.border,
+            borderWidth: listComp.styles?.borderWidth,
+            borderStyle: listComp.styles?.borderStyle,
+            borderColor: listComp.styles?.borderColor,
+            borderRadius: listComp.styles?.borderRadius,
+            boxShadow: listComp.styles?.boxShadow,
+            opacity: listComp.styles?.opacity
+          };
+
+          // List-specific styles
+          const listStyles = {
+            fontSize: listComp.styles?.fontSize,
+            fontFamily: listComp.styles?.fontFamily,
+            fontWeight: listComp.styles?.fontWeight,
+            color: listComp.styles?.color,
+            lineHeight: listComp.styles?.lineHeight,
+            listStyleType: listComp.styles?.listStyleType || (listComp.listType === 'ol' ? 'decimal' : 'disc'),
+            listStylePosition: listComp.styles?.listStylePosition || 'outside',
+            paddingLeft: '20px',
+            margin: '0'
+          };
+
           const listItems = listComp.items.map(item => `<li>${item}</li>`).join('');
-          const listStyles = stylesToString({
-            ...listComp.styles,
-            listStyleType: listComp.styles?.listStyleType || (listComp.listType === 'ol' ? 'decimal' : 'disc')
-          });
-          return `<${listComp.listType} style="${listStyles}">${listItems}</${listComp.listType}>`;
+
+          return `<div style="${stylesToString(ListContainerStyles)}">
+              <${listComp.listType} style="${stylesToString(listStyles)}">${listItems}</${listComp.listType}>
+            </div>`;
+
         case 'container':
           const containerComp = component as ContainerComponent;
           const containerContent = containerComp.children?.map(renderComponent).join('') || '';
@@ -1571,13 +3175,30 @@ export default function EmailEditor({
           const columnWidths = columnComp.columnWidths || ['50%', '50%'];
           const columnGap = columnComp.styles?.gap || '8px';
 
-          return `<table style="width: 100%; ${stylesToString(columnComp.styles)}" cellspacing="${columnGap.replace('px', '')}" cellpadding="0">
+          // Parse gap for table cellspacing
+          const parseGapForTable = (gap: string) => {
+            const match = gap.match(/^(\d*\.?\d+)(.*)/);
+            const value = parseFloat(match?.[1] || '0');
+            const unit = match?.[2] || 'px';
+
+            // Convert to pixels for table cellspacing
+            if (unit === 'rem') {
+              return Math.min(value * 16, 32); // Cap at 32px
+            } else if (unit === 'em') {
+              return Math.min(value * 16, 32); // Cap at 32px
+            }
+            return Math.min(value, 32); // Cap px values at 32
+          };
+
+          const gapValue = parseGapForTable(columnGap);
+
+          return `<table style="width: 100%; max-width: 100%; ${stylesToString(columnComp.styles)}" cellspacing="${gapValue}" cellpadding="0" border="0">
               <tr>
                 ${columnWidths.map((width, index) => {
             const columnContent = Array.isArray(columnComp.children?.[index])
               ? columnComp.children[index].map(renderComponent).join('')
               : '';
-            return `<td style="width: ${width}; vertical-align: top; padding: 10px;">${columnContent}</td>`;
+            return `<td style="width: ${width}; vertical-align: top; padding: 10px; max-width: 0; overflow-wrap: break-word;">${columnContent}</td>`;
           }).join('')}
               </tr>
             </table>`;
@@ -1618,8 +3239,15 @@ export default function EmailEditor({
   // Utility functions
   const stylesToString = (styles?: ComponentStyles): string => {
     if (!styles) return '';
+
     return Object.entries(styles)
-      .filter(([_, value]) => value !== undefined && value !== '' && value !== 'transparent')
+      .filter(([_, value]) => {
+        return value !== undefined &&
+          value !== '' &&
+          value !== 'transparent' &&
+          value !== 'none' &&
+          value !== null;
+      })
       .map(([key, value]) => `${camelToKebab(key)}: ${value}`)
       .join('; ');
   };
@@ -1651,24 +3279,64 @@ export default function EmailEditor({
   };
 
   const handleDragLeave = (e: React.DragEvent, targetId: string) => {
-    // Only clear if we're actually leaving the target (not entering a child)
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+    // Use a more reliable method to detect if we're actually leaving the target
+    const rect = e.currentTarget.getBoundingClientRect();
+    const isActuallyLeaving = (
+      e.clientX < rect.left ||
+      e.clientX > rect.right ||
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom
+    );
+
+    if (isActuallyLeaving) {
+      console.log('Actually leaving:', targetId); // Debug log
       setDragOverTarget(null);
     }
   };
 
+  // Update handleDrop to support prebuilt components
   const handleDrop = (e: React.DragEvent, index: number = components.length, parentId?: string, columnIndex?: number) => {
     e.preventDefault();
     e.stopPropagation();
+
     const componentType = e.dataTransfer.getData('componentType');
-    if (componentType) {
+    const prebuiltComponent = e.dataTransfer.getData('prebuiltComponent');
+
+    if (prebuiltComponent) {
+      // Handle prebuilt component drop
+      try {
+        const parsedComponent = JSON.parse(prebuiltComponent);
+        const newComponent = {
+          ...parsedComponent,
+          id: generateUniqueId()
+        };
+
+        saveState();
+        if (parentId) {
+          // Add to container or column
+          addComponent('', index, parentId, columnIndex, newComponent);
+        } else {
+          // Add to main canvas
+          setComponents(prev => {
+            const newComponents = [...prev];
+            newComponents.splice(index, 0, newComponent);
+            return newComponents;
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing prebuilt component:', error);
+      }
+    } else if (componentType) {
+      // Handle regular component drop
       addComponent(componentType, index, parentId, columnIndex);
     }
+
+    // Clean up drag state
     setIsDragging(false);
     setDragOverTarget(null);
     setDraggedComponentType(null);
   };
-  // Handle component selection
+
   const handleComponentSelect = useCallback((component: EmailComponent) => {
     setSelectedComponent(JSON.parse(JSON.stringify(component)));
     setSelectedTarget('component');
@@ -1680,13 +3348,25 @@ export default function EmailEditor({
     setSelectedTarget('canvas');
   }, []);
 
+
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Enhanced Toolbar with Zoom Controls */}
       <div className="border-b bg-card p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <h2 className="text-lg font-semibold">Email Template Editor</h2>
+            <h2 className="text-lg font-semibold"><EnsembleLogo className="h-8 w-8" /></h2>
+            {/* Add Template Library Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsTemplateLibraryOpen(true)}
+              className="ml-4"
+            >
+              <Layout className="h-4 w-4 mr-1" />
+              Templates
+            </Button>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -1783,13 +3463,46 @@ export default function EmailEditor({
               Preview
             </Button>
 
-            <Button
-              size="sm"
-              onClick={() => onExport?.(generateHTML())}
-            >
-              <Download className="h-4 w-4" />
-              Export HTML
-            </Button>
+
+            {/* Enhanced Save Button with Status */}
+            <div className="flex items-center space-x-2">
+              {/* Save Status Indicator */}
+              {hasUnsavedChanges && (
+                <div className="flex items-center space-x-1 text-xs text-amber-600  px-2 py-1 rounded">
+                  <div className="w-2 h-2 rounded-full bg-amber-400"></div>
+                  <span>Unsaved changes</span>
+                </div>
+              )}
+
+              {lastSaved && !hasUnsavedChanges && (
+                <div className="flex items-center space-x-1 text-xs text-green-600  px-2 py-1 rounded">
+                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                  <span>Saved {formatTimeAgo(lastSaved)}</span>
+                </div>
+              )}
+
+              {/* Export HTML - Now Secondary */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onExport?.(generateHTML())}
+                disabled={!onExport}
+              >
+                <Download className="h-4 w-4" />
+                Export HTML
+              </Button>
+
+              {/* Save Button - Primary Action */}
+              <Button
+                size="sm"
+                onClick={handleManualSave}
+                disabled={!onSave || readOnly}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium min-w-[120px]"
+              >
+                <Save className="h-4 w-4 mr-1" />
+                {hasUnsavedChanges ? 'Save Changes' : (<span className="flex items-center space-x-1 gap-1"><Check className="h-4 w-4" />Saved</span>)}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -1798,6 +3511,18 @@ export default function EmailEditor({
         {/* Left Sidebar - Components */}
         {!readOnly && (
           <div className="w-64 border-r bg-card p-4 overflow-y-auto">
+            {/* Quick Templates Access */}
+            <div className="mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsTemplateLibraryOpen(true)}
+                className="w-full"
+              >
+                <Layout className="h-4 w-4 mr-2" />
+                Browse Templates
+              </Button>
+            </div>
             <Tabs defaultValue="basic" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="basic">Basic</TabsTrigger>
@@ -1857,101 +3582,100 @@ export default function EmailEditor({
           onClick={handleCanvasSelect}
         >
           {/* Main Canvas */}
-          <div className="flex-1 bg-muted/30 p-6 overflow-auto">
-            <div
-              className={`mx-auto transition-all duration-200 email-editor ${previewMode === 'mobile' ? 'max-w-sm' : ''
-                } ${isDragging ? 'ring-2 ring-blue-200 ring-dashed' : ''
-                } ${dragOverTarget === 'main-canvas' ? 'ring-4 ring-blue-400 ring-dashed bg-blue-50' : ''
-                }`}
-              style={{
-                width: previewMode === 'mobile' ? '375px' : canvasSettings.contentWidth,
-                maxWidth: canvasSettings.maxWidth,
-                backgroundColor: canvasSettings.contentBackgroundColor,
-                transform: `scale(${zoomLevel / 100})`,
-                transformOrigin: 'top center',
-                minHeight: '500px'
-              }}
-              onClick={handleCanvasSelect}
-              onDrop={(e) => handleDrop(e)}
-              onDragOver={handleDragOver}
-              onDragEnter={(e) => handleDragEnter(e, 'main-canvas')}
-              onDragLeave={(e) => handleDragLeave(e, 'main-canvas')}
-            >
-              {components.length === 0 && (
-                <div className={`flex items-center justify-center h-64 border-2 border-dashed rounded-lg transition-all duration-200 ${isDragging
-                  ? 'border-blue-400 bg-blue-50 text-blue-600'
-                  : 'border-gray-300 text-gray-500'
-                  }`}>
-                  <div className="text-center">
-                    <div className="text-lg mb-2">
-                      {isDragging ? '📥' : '📄'}
-                    </div>
-                    <p className="text-sm">
-                      {isDragging
-                        ? `Drop ${draggedComponentType} here to add it to your email`
-                        : 'Drag components here to start building your email'
-                      }
-                    </p>
+          <div
+            className={`mx-auto transition-all duration-200 email-editor ${previewMode === 'mobile' ? 'max-w-sm' : ''
+              } ${isDragging ? 'ring-2 ring-blue-200 ring-dashed' : ''
+              } ${dragOverTarget === 'main-canvas' ? 'ring-4 ring-blue-400 ring-dashed bg-blue-50' : ''
+              }`}
+            style={{
+              width: previewMode === 'mobile' ? '375px' : canvasSettings.contentWidth,
+              maxWidth: canvasSettings.maxWidth,
+              backgroundColor: canvasSettings.contentBackgroundColor,
+              transform: `scale(${zoomLevel / 100})`,
+              transformOrigin: 'top center',
+              minHeight: '500px'
+            }}
+            onClick={handleCanvasSelect}
+            onDrop={(e) => handleDrop(e)}
+            onDragOver={handleDragOver}
+            onDragEnter={(e) => handleDragEnter(e, 'main-canvas')}
+            onDragLeave={(e) => handleDragLeave(e, 'main-canvas')}
+          >
+            {components.length === 0 && (
+              <div className={`flex items-center justify-center h-64 border-2 border-dashed rounded-lg transition-all duration-200 ${isDragging
+                ? 'border-blue-400 bg-blue-50 text-blue-600'
+                : 'border-gray-300 text-gray-500'
+                }`}>
+                <div className="text-center">
+                  <div className="text-lg mb-2">
+                    {isDragging ? '📥' : '📄'}
                   </div>
+                  <p className="text-sm">
+                    {isDragging
+                      ? `Drop ${draggedComponentType} here to add it to your email`
+                      : 'Drag components here to start building your email'
+                    }
+                  </p>
                 </div>
-              )}
+              </div>
+            )}
 
-              {components.map((component, index) => (
-                <div
-                  key={component.id}
-                  className={`relative transition-all duration-200 ${isDragging ? 'border-t-2 border-dashed border-transparent hover:border-blue-400' : ''
-                    }`}
-                  onDrop={(e) => handleDrop(e, index)}
-                  onDragOver={handleDragOver}
-                  onDragEnter={(e) => handleDragEnter(e, `component-${index}`)}
-                  onDragLeave={(e) => handleDragLeave(e, `component-${index}`)}
-                >
-                  {/* Drop indicator above component */}
-                  {isDragging && dragOverTarget === `component-${index}` && (
-                    <div className="h-2 bg-blue-400 rounded mb-2 animate-pulse"></div>
-                  )}
+            {components.map((component, index) => (
+              <div
+                key={component.id}
+                className={`relative transition-all duration-200 ${isDragging ? 'border-t-2 border-dashed border-transparent hover:border-blue-400' : ''
+                  }`}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragOver={handleDragOver}
+                onDragEnter={(e) => handleDragEnter(e, `component-${index}`)}
+                onDragLeave={(e) => handleDragLeave(e, `component-${index}`)}
+              >
+                {/* Drop indicator above component */}
+                {isDragging && dragOverTarget === `component-${index}` && (
+                  <div className="h-2 bg-blue-400 rounded mb-2 animate-pulse"></div>
+                )}
 
-                  <ComponentRenderer
-                    component={component}
-                    isSelected={selectedComponent?.id === component.id}
-                    onSelect={handleComponentSelect}
-                    onDrop={handleDrop}
-                    index={index}
-                    totalComponents={components.length}
-                    onMoveUp={() => moveComponentUp(index)}
-                    onMoveDown={() => moveComponentDown(index)}
-                    onDuplicate={() => duplicateComponent(index)}
-                    onDelete={() => deleteComponent(component.id)}
-                    onDeleteFromColumn={deleteComponentFromColumn}
-                    onMoveUpInColumn={moveComponentUpInColumn}
-                    onMoveDownInColumn={moveComponentDownInColumn}
-                    onDuplicateInColumn={duplicateComponentInColumn}
-                    onDeleteFromContainer={deleteComponentFromContainer}
-                    onMoveUpInContainer={moveComponentUpInContainer}
-                    onMoveDownInContainer={moveComponentDownInContainer}
-                    onDuplicateInContainer={duplicateComponentInContainer}
-                    // Pass drag states as props
-                    isDragging={isDragging}
-                    dragOverTarget={dragOverTarget}
-                    draggedComponentType={draggedComponentType}
-                    onDragEnter={handleDragEnter}
-                    onDragLeave={handleDragLeave}
-                  />
-                </div>
-              ))}
+                <ComponentRenderer
+                  component={component}
+                  isSelected={selectedComponent?.id === component.id}
+                  onSelect={handleComponentSelect}
+                  onDrop={handleDrop}
+                  index={index}
+                  totalComponents={components.length}
+                  onMoveUp={() => moveComponentUp(index)}
+                  onMoveDown={() => moveComponentDown(index)}
+                  onDuplicate={() => duplicateComponent(index)}
+                  onDelete={() => deleteComponent(component.id)}
+                  onDeleteFromColumn={deleteComponentFromColumn}
+                  onMoveUpInColumn={moveComponentUpInColumn}
+                  onMoveDownInColumn={moveComponentDownInColumn}
+                  onDuplicateInColumn={duplicateComponentInColumn}
+                  onDeleteFromContainer={deleteComponentFromContainer}
+                  onMoveUpInContainer={moveComponentUpInContainer}
+                  onMoveDownInContainer={moveComponentDownInContainer}
+                  onDuplicateInContainer={duplicateComponentInContainer}
+                  // Pass drag states as props
+                  isDragging={isDragging}
+                  dragOverTarget={dragOverTarget}
+                  draggedComponentType={draggedComponentType}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                />
+              </div>
+            ))}
 
-              {/* Drop zone at the end */}
-              {isDragging && (
-                <div
-                  className="h-12 border-2 border-dashed border-blue-400 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 text-sm mt-4"
-                  onDrop={(e) => handleDrop(e, components.length)}
-                  onDragOver={handleDragOver}
-                >
-                  Drop here to add at the end
-                </div>
-              )}
-            </div>
+            {/* Drop zone at the end */}
+            {isDragging && (
+              <div
+                className="h-12 border-2 border-dashed border-blue-400 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 text-sm"
+                onDrop={(e) => handleDrop(e, components.length)}
+                onDragOver={handleDragOver}
+              >
+                Drop here to add at the end
+              </div>
+            )}
           </div>
+
 
         </div>
 
@@ -1976,12 +3700,17 @@ export default function EmailEditor({
       </div>
 
       {/* Preview Modal */}
-      <PreviewModal
+      <EnhancedPreviewModal
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
         htmlContent={generateHTML()}
-        previewMode={previewMode}
-        onPreviewModeChange={setPreviewMode}
+      />
+
+      <TemplateLibraryModal
+        isOpen={isTemplateLibraryOpen}
+        onClose={() => setIsTemplateLibraryOpen(false)}
+        onSelectTemplate={handleSelectTemplate}
+        onSelectComponent={handleSelectComponent}
       />
     </div>
   );
@@ -2337,23 +4066,59 @@ function ComponentRenderer({
       case 'container':
         const containerComp = component as ContainerComponent;
         const containerId = `container-${component.id}`;
+        const isContainerDropTarget = dragOverTarget === containerId;
 
         return (
-          <div className={`border border-dashed border-gray-300 p-4 mb-4 transition-all duration-200 ${isDragging ? 'hover:border-blue-400 hover:bg-blue-50' : ''
-            } ${dragOverTarget === containerId ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-200' : ''
+          <div className={`border border-dashed border-gray-300 transition-all duration-200 ${isDragging ? 'hover:border-blue-400 hover:bg-blue-50' : ''
+            } ${isContainerDropTarget ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-200' : ''
             }`}>
-            <div className="text-xs text-gray-500 mb-2">Container</div>
             <div
               style={{
                 ...containerComp.styles,
                 boxShadow: containerComp.styles?.boxShadow
               }}
-              onDrop={(e) => onDrop(e, 0, component.id)}
-              onDragOver={handleDragOver}
-              onDragEnter={(e) => onDragEnter?.(e, containerId)}
-              onDragLeave={(e) => onDragLeave?.(e, containerId)}
               className="min-h-[50px] relative"
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Container drop:', containerId); // Debug log
+                onDrop(e, 0, component.id);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Container drag enter:', containerId); // Debug log
+                onDragEnter?.(e, containerId);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                const rect = e.currentTarget.getBoundingClientRect();
+                const isLeavingContainer = (
+                  e.clientX < rect.left ||
+                  e.clientX > rect.right ||
+                  e.clientY < rect.top ||
+                  e.clientY > rect.bottom
+                );
+
+                if (isLeavingContainer) {
+                  console.log('Container drag leave:', containerId); // Debug log
+                  onDragLeave?.(e, containerId);
+                }
+              }}
             >
+              {/* Drop indicator overlay */}
+              {isDragging && isContainerDropTarget && (containerComp.children || []).length > 0 && (
+                <div className="absolute inset-0 border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-30 rounded flex items-center justify-center z-10 pointer-events-none">
+                  <div className="text-blue-600 text-sm font-medium">
+                    Drop {draggedComponentType} in container
+                  </div>
+                </div>
+              )}
+
               {(containerComp.children || []).map((childComponent, childIndex) => (
                 <div key={childComponent.id} className="relative group mb-2">
                   {renderChildComponent(childComponent, {
@@ -2363,17 +4128,22 @@ function ComponentRenderer({
                     onMoveDown: () => onMoveDownInContainer(component.id, childIndex),
                     onDuplicate: () => onDuplicateInContainer(component.id, childIndex),
                     onDelete: () => onDeleteFromContainer(component.id, childIndex),
-                    parentId: component.id
+                    parentId: component.id,
+                    isDragging,
+                    dragOverTarget,
+                    draggedComponentType,
+                    onDragEnter,
+                    onDragLeave
                   })}
                 </div>
               ))}
 
               {(containerComp.children || []).length === 0 && (
-                <div className={`text-xs text-center py-8 rounded border-2 border-dashed transition-all duration-200 ${isDragging && dragOverTarget === containerId
-                    ? 'border-blue-400 bg-blue-100 text-blue-600'
-                    : 'border-gray-200 text-gray-400'
+                <div className={`text-xs text-center rounded border-2 border-dashed transition-all duration-200 ${isDragging && isContainerDropTarget
+                  ? 'border-blue-400 bg-blue-100 text-blue-600'
+                  : 'border-gray-200 text-gray-400'
                   }`}>
-                  {isDragging
+                  {isDragging && isContainerDropTarget
                     ? `Drop ${draggedComponentType} here`
                     : 'Drop components here'
                   }
@@ -2384,36 +4154,112 @@ function ComponentRenderer({
         );
 
 
+
       case 'column':
         const colComp = component as ColumnComponent;
         const columnWidths = colComp.columnWidths || ['50%', '50%'];
         const columnGap = colComp.styles?.gap || '8px';
 
+        // Parse gap value to calculate available space
+        const parseGapValue = (gap: string) => {
+          const match = gap.match(/^(\d*\.?\d+)(.*)/);
+          const value = parseFloat(match?.[1] || '0');
+          const unit = match?.[2] || 'px';
+
+          // Convert rem to px for calculation (assuming 16px = 1rem)
+          if (unit === 'rem') {
+            return value * 16;
+          } else if (unit === 'em') {
+            return value * 16; // Approximate
+          }
+          return value; // px
+        };
+
+        const gapInPx = parseGapValue(columnGap);
+        const numberOfGaps = columnWidths.length - 1;
+        const totalGapWidth = gapInPx * numberOfGaps;
+
         return (
-          <div className={`border border-dashed border-gray-300 transition-all duration-200 ${isDragging ? 'hover:border-blue-400' : ''
-            }`}
+          <div
+            className={`border border-dashed border-gray-300 p-2 mb-4 transition-all duration-200 column-container ${isDragging ? 'hover:border-blue-400' : ''
+              }`}
             style={{
               ...colComp.styles,
-              boxShadow: colComp.styles?.boxShadow
+              boxShadow: colComp.styles?.boxShadow,
+              overflow: 'hidden' // Prevent overflow
             }}
           >
-            <div className="flex" style={{ gap: columnGap }}>
+            <div
+              className="flex"
+              style={{
+                gap: columnGap,
+                width: '100%',
+                maxWidth: '100%',
+                overflow: 'hidden' // Ensure no overflow
+              }}
+            >
               {columnWidths.map((width, colIndex) => {
                 const columnId = `column-${component.id}-${colIndex}`;
+                const isDropTarget = dragOverTarget === columnId;
+
+                // Calculate adjusted width accounting for gaps
+                const widthPercent = parseFloat(width.replace('%', ''));
+                const adjustedWidth = `calc(${width} - ${totalGapWidth / columnWidths.length}px)`;
+
                 return (
                   <div
                     key={colIndex}
-                    className={`border border-gray-200 p-2 min-h-[100px] flex-shrink-0 transition-all duration-200 ${isDragging ? 'hover:border-blue-400 hover:bg-blue-50' : ''
-                      } ${dragOverTarget === columnId ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-200' : ''
+                    className={`  flex-shrink-0 transition-all duration-200 relative ${isDragging ? 'hover:border-blue-400 hover:bg-blue-50' : ''
+                      } ${isDropTarget ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-200' : ''
                       }`}
-                    style={{ width }}
-                    onDrop={(e) => onDrop(e, 0, component.id, colIndex)}
-                    onDragOver={handleDragOver}
-                    onDragEnter={(e) => onDragEnter?.(e, columnId)}
-                    onDragLeave={(e) => onDragLeave?.(e, columnId)}
+                    style={{
+                      width: totalGapWidth > 100 ? width : adjustedWidth, // Use original width if gap is too large
+                      minWidth: '50px', // Minimum column width
+                      maxWidth: '100%'
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('Column drop:', columnId);
+                      onDrop(e, 0, component.id, colIndex);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('Column drag enter:', columnId);
+                      onDragEnter?.(e, columnId);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const isLeavingColumn = (
+                        e.clientX < rect.left ||
+                        e.clientX > rect.right ||
+                        e.clientY < rect.top ||
+                        e.clientY > rect.bottom
+                      );
+
+                      if (isLeavingColumn) {
+                        console.log('Column drag leave:', columnId);
+                        onDragLeave?.(e, columnId);
+                      }
+                    }}
                   >
+                    {/* Drop indicator overlay when dragging over */}
+                    {isDragging && isDropTarget && (
+                      <div className="absolute inset-0 border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-50 rounded flex items-center justify-center z-10 pointer-events-none">
+                        <div className="text-blue-600 text-sm font-medium">
+                          Drop {draggedComponentType} here
+                        </div>
+                      </div>
+                    )}
+
                     {(colComp.children?.[colIndex] || []).map((childComponent, childIndex) => (
-                      <div key={childComponent.id} className="relative group mb-2">
+                      <div key={childComponent.id} className="relative component-wrapper mb-2">
                         {renderChildComponent(childComponent, {
                           index: childIndex,
                           totalComponents: (colComp.children?.[colIndex] || []).length,
@@ -2421,19 +4267,24 @@ function ComponentRenderer({
                           onMoveDown: () => onMoveDownInColumn(component.id, colIndex, childIndex),
                           onDuplicate: () => onDuplicateInColumn(component.id, colIndex, childIndex),
                           onDelete: () => onDeleteFromColumn(component.id, colIndex, childIndex),
-                          parentId: component.id
+                          parentId: component.id,
+                          isDragging,
+                          dragOverTarget,
+                          draggedComponentType,
+                          onDragEnter,
+                          onDragLeave
                         })}
                       </div>
                     ))}
 
                     {(colComp.children?.[colIndex] || []).length === 0 && (
-                      <div className={`text-xs text-center py-8 rounded border border-dashed transition-all duration-200 ${isDragging && dragOverTarget === columnId
-                          ? 'border-blue-400 bg-blue-100 text-blue-600'
-                          : 'border-gray-300 text-gray-400'
+                      <div className={`text-xs text-center py-8 rounded border border-dashed transition-all duration-200 ${isDragging && isDropTarget
+                        ? 'border-blue-400 bg-blue-100 text-blue-600'
+                        : 'border-gray-300 text-gray-400'
                         }`}>
-                        {isDragging
+                        {isDragging && isDropTarget
                           ? `Drop ${draggedComponentType} in column ${colIndex + 1}`
-                          : `Drop components here`
+                          : 'Drop components here'
                         }
                       </div>
                     )}
@@ -2443,7 +4294,9 @@ function ComponentRenderer({
             </div>
           </div>
         );
-        
+
+
+
 
 
 
@@ -2859,6 +4712,48 @@ function EnhancedPropertiesPanel({ component, onUpdate, onDelete }: PropertiesPa
           </>
         )}
 
+        {component.type === 'image' && (
+          <div className='flex flex-col gap-3'>
+            <div className="flex items-center space-x-2 mb-2">
+              <Image className="h-4 w-4 " />
+              <Label className=" font-medium">Image Properties</Label>
+            </div>
+
+            {/* Image URL */}
+            <div>
+              <Label>Image URL</Label>
+              <Input
+                value={(component as ImageComponent).src || ''}
+                onChange={(e) => {
+                  onUpdate({
+                    src: e.target.value
+                  } as Partial<EmailComponent>);
+                }}
+                placeholder="https://example.com/image.jpg"
+                className="mt-1"
+              />
+              <div className="text-xs  mt-1">
+                Enter the URL of the image you want to display
+              </div>
+            </div>
+
+            {/* Alt Text */}
+            <div>
+              <Label>Alt Text</Label>
+              <Input
+                value={(component as ImageComponent).alt || ''}
+                onChange={(e) => {
+                  onUpdate({
+                    alt: e.target.value
+                  } as Partial<EmailComponent>);
+                }}
+                placeholder="Describe this image"
+                className="mt-1"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Image specific properties */}
         {component.type === 'image' && (
           <div>
@@ -2888,6 +4783,8 @@ function EnhancedPropertiesPanel({ component, onUpdate, onDelete }: PropertiesPa
             </div>
           </div>
         )}
+
+
 
         {/* Spacer specific properties */}
         {component.type === 'spacer' && (
@@ -3352,6 +5249,49 @@ function EnhancedPropertiesPanel({ component, onUpdate, onDelete }: PropertiesPa
                 />
               </div>
             </div>
+
+
+
+            {component.type === 'column' && (
+              <div>
+                <Label>Column Gap</Label>
+                <NumberInput
+                  value={getStyleValue(component, 'gap') || '8px'}
+                  onChange={(value) => {
+                    // Parse and validate the gap value
+                    const match = value.match(/^(\d*\.?\d+)(.*)/);
+                    const numValue = parseFloat(match?.[1] || '0');
+                    const unit = match?.[2] || 'px';
+
+                    // Set maximum values to prevent overflow
+                    let maxValue = numValue;
+                    if (unit === 'rem' && numValue > 2) {
+                      maxValue = 2; // Max 2rem
+                    } else if (unit === 'px' && numValue > 32) {
+                      maxValue = 32; // Max 32px
+                    } else if (unit === 'em' && numValue > 2) {
+                      maxValue = 2; // Max 2em
+                    }
+
+                    const finalValue = `${maxValue}${unit}`;
+
+                    onUpdate({
+                      styles: {
+                        ...component.styles,
+                        gap: finalValue
+                      }
+                    } as Partial<EmailComponent>);
+                  }}
+                  placeholder="8"
+                  units={['px', 'em', 'rem']}
+                  defaultUnit="px"
+                  max={50} // Set reasonable maximum
+                />
+                <div className="text-xs text-gray-500 mt-1">
+                  Large gaps may cause columns to overflow. Recommended: 8-32px, 0.5-2rem
+                </div>
+              </div>
+            )}
 
             {/* Padding Control */}
             <SpacingControl
