@@ -3,14 +3,16 @@ import type { SSOUser } from '@/app/types/auth';
 
 // Mock SSO user data for development
 const mockSSOUser: SSOUser = {
-  firstName: "Ensemble",
-  lastName: "Test",
-  fullName: "Ensemble Test",
-  adsId: "ensemble",
-  guid: "@fca9376056149663519865855188315",
-  employeeId: "8229989",
-  email: "ensemble.test@daexp.com",
-  groups: ["SSO_ENSEMBLE_E1"]
+  attributes: {
+    firstName: "Ensemble",
+    lastName: "Test",
+    fullName: "Ensemble Test",
+    adsId: "ensemble",
+    guid: "@fca9376056149663519865855188315",
+    employeeId: "8229989",
+    email: "ensemble.test@daexp.com",
+    groups: ["SSO_ENSEMBLE_E1"]
+  }
 };
 
 export function useSSOPolicy() {

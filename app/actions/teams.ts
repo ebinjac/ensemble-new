@@ -4,7 +4,8 @@ import { db } from '@/db';
 import { teams, teamRegistrationRequests } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth } from '@/app/(auth)/lib/auth';
+import * as z from 'zod';
 
 export type TeamRegistrationData = {
   teamName: string;
@@ -179,6 +180,10 @@ export async function approveTeamRegistration(
         adminGroup: request.adminGroup,
         contactName: request.contactName,
         contactEmail: request.contactEmail,
+        createdBy: reviewedBy,
+        updatedBy: reviewedBy,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
     });
 
@@ -240,5 +245,53 @@ export async function getAllTeams() {
   } catch (error) {
     console.error('Failed to get all teams:', error);
     throw error;
+  }
+}
+
+// Validation schema for team updates
+const updateTeamSchema = z.object({
+  teamName: z.string().min(3, "Team name must be at least 3 characters"),
+  userGroup: z.string().min(3, "User group must be at least 3 characters"),
+  adminGroup: z.string().min(3, "Admin group must be at least 3 characters"),
+  contactName: z.string().nullable(),
+  contactEmail: z.string().email("Invalid email address").nullable(),
+});
+
+type UpdateTeamData = z.infer<typeof updateTeamSchema>;
+
+export async function updateTeam(teamId: string, data: UpdateTeamData) {
+  try {
+    const user = await requireAuth();
+    
+    // Check if user is admin for this team
+    const isAdmin = user.teams?.some(team => team.teamId === teamId && team.role === 'admin');
+    if (!isAdmin) {
+      throw new Error("Only team admins can update team settings");
+    }
+
+    // Validate input data
+    const validatedData = updateTeamSchema.parse(data);
+
+    // Update team
+    await db.update(teams)
+      .set({
+        teamName: validatedData.teamName,
+        userGroup: validatedData.userGroup,
+        adminGroup: validatedData.adminGroup,
+        contactName: validatedData.contactName || undefined,
+        contactEmail: validatedData.contactEmail || undefined,
+        updatedBy: user.user.email,
+        updatedAt: new Date(),
+      })
+      .where(eq(teams.id, teamId));
+
+    revalidatePath(`/teams/${teamId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update team:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to update team settings' 
+    };
   }
 } 

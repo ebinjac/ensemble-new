@@ -1,12 +1,14 @@
 export type SSOUser = {
-  firstName: string;
-  lastName: string;
-  fullName: string;
-  adsId: string;
-  guid: string;
-  employeeId: string;
-  email: string;
-  groups: string[];
+  attributes: {
+    firstName: string;
+    lastName: string;
+    fullName: string;
+    adsId: string;
+    guid: string;
+    employeeId: string;
+    email: string;
+    groups: string[];
+  };
 };
 
 export type TeamAccess = {
@@ -16,13 +18,14 @@ export type TeamAccess = {
 };
 
 export type JWTPayload = {
-  user: Omit<SSOUser, 'groups'>;
-  teams: TeamAccess[];
-  groups: string[];
+  data: string; // Encrypted session data
+  jti?: string; // Session ID
+  iat?: number; // Issued at
+  exp?: number; // Expiration time
 };
 
 export type AuthResponse = {
-  token: string;
   user: SSOUser;
   teams: TeamAccess[];
+  expiresAt: number;
 }; 

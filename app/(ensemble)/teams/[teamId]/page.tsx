@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth } from "@/app/(auth)/lib/auth";
 import { db } from "@/db";
 import { teams, applications } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ApplicationsList from "@/components/teams/applications-list";
-import NewApplicationDialog from "@/components/teams/new-application-dialog";
+import TeamSettings from '@/components/teams/register/TeamSettings';
+import NewApplicationDialog from "@/components/teams/applications/NewApplicationDialog";
 
 async function getTeamData(teamId: string) {
   const user = await requireAuth();
@@ -33,13 +34,22 @@ async function getTeamData(teamId: string) {
   };
 }
 
-export default async function TeamDashboard({ params: { teamId } }: { params: { teamId: string } }) {
+interface PageProps {
+  params: Promise<{ teamId: string }>;
+}
+
+export default async function TeamDashboard({ params }: PageProps) {
+  // Await the params object
+  const { teamId } = await params;
+
   // Validate teamId parameter
   if (!teamId) {
     return notFound();
   }
 
   const teamDetails = await getTeamData(teamId);
+  const user = await requireAuth();
+  const isAdmin = user.teams?.some(team => team.teamId === teamId && team.role === 'admin');
 
   if (!teamDetails) {
     return notFound();
@@ -76,35 +86,7 @@ export default async function TeamDashboard({ params: { teamId } }: { params: { 
         </TabsContent>
 
         <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Team Settings</CardTitle>
-              <CardDescription>
-                Manage your team's settings and configurations
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium">Team Information</h3>
-                  <div className="grid gap-2 mt-2">
-                    <div>
-                      <span className="text-sm font-medium">Team Name:</span>
-                      <span className="ml-2 text-sm text-muted-foreground">{teamDetails.teamName}</span>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium">User Group:</span>
-                      <span className="ml-2 text-sm text-muted-foreground">{teamDetails.userGroup}</span>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium">Admin Group:</span>
-                      <span className="ml-2 text-sm text-muted-foreground">{teamDetails.adminGroup}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <TeamSettings teamDetails={teamDetails} isAdmin={isAdmin} teamId={teamId} />
         </TabsContent>
 
         <TabsContent value="members">
@@ -116,8 +98,13 @@ export default async function TeamDashboard({ params: { teamId } }: { params: { 
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Team members list will be implemented later */}
-              <p className="text-sm text-muted-foreground">Team members management coming soon</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Members of this group have access to the portal. To get access, raise an IIQ request to get access to the team.
+              </p>
+              {/* Placeholder for members list */}
+              <ul className="list-disc pl-6 text-sm text-muted-foreground">
+                <li>Member management coming soon...</li>
+              </ul>
             </CardContent>
           </Card>
         </TabsContent>

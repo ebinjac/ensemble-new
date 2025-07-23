@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { DIcons } from "dicons"
+import { Mail, BarChart2, Repeat, Server, Link as LinkIcon, Star, CreditCard, Building2, Users, Folder, Settings } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import {
@@ -15,44 +15,38 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu"
 
-const tools: { title: string; href: string; description: string; icon: keyof typeof DIcons }[] = [
+const tools = [
   {
-    title: "Workflow Builder",
-    href: "/tools/workflow-builder",
-    description: "Visual workflow designer to create and manage automated processes and pipelines.",
-    icon: "Settings",
+    title: "BlueMailer",
+    href: "/tools/bluemailer",
+    description: "An email template editor and notification sender.",
+    icon: <Mail className="h-4 w-4" />,
   },
   {
-    title: "Task Manager",
-    href: "/tools/task-manager",
-    description: "Organize, track, and prioritize tasks across your team and projects.",
-    icon: "Plus",
+    title: "Scorecard",
+    href: "/tools/scorecard",
+    description: "Tracks the volume and availability of applications.",
+    icon: <BarChart2 className="h-4 w-4" />,
   },
   {
-    title: "Resource Monitor",
-    href: "/tools/resource-monitor",
-    description: "Real-time monitoring of system resources, deployments, and infrastructure.",
-    icon: "Activity",
+    title: "To-Hub",
+    href: "/tools/to-hub",
+    description: "Helps with shift transition.",
+    icon: <Repeat className="h-4 w-4" />,
   },
   {
-    title: "Integration Hub",
-    href: "/tools/integration-hub",
-    description: "Connect and manage all your development tools and services in one place.",
-    icon: "Plug",
+    title: "EnvMatrix",
+    href: "/tools/envmatrix",
+    description: "Keep details about your applications such as firewall, IP, and related details.",
+    icon: <Server className="h-4 w-4" />,
   },
   {
-    title: "Analytics Dashboard",
-    href: "/tools/analytics",
-    description: "Comprehensive insights into your workflows, performance metrics, and team productivity.",
-    icon: "ChartBar",
+    title: "LinkManager",
+    href: "/tools/linkmanager",
+    description: "Manages important links for your team.",
+    icon: <LinkIcon className="h-4 w-4" />,
   },
-  {
-    title: "API Gateway",
-    href: "/tools/api-gateway",
-    description: "Centralized API management, monitoring, and documentation.",
-    icon: "Code",
-  },
-]
+];
 
 const resources: { title: string; href: string; description: string }[] = [
   {
@@ -86,7 +80,6 @@ export function EnsembleNavigation() {
                     href="/dashboard"
                     className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
                   >
-                    <DIcons.Sparkles className="h-6 w-6 text-primary mb-3" />
                     <div className="mb-2 text-lg font-medium">
                       Ensemble Dashboard
                     </div>
@@ -96,13 +89,13 @@ export function EnsembleNavigation() {
                   </Link>
                 </NavigationMenuLink>
               </li>
-              <ListItem href="/features" title="Features" icon={<DIcons.Star className="h-4 w-4" />}>
+              <ListItem href="/features" title="Features" icon={<Star className="h-4 w-4" />}>
                 Explore the full capabilities of the Ensemble platform.
               </ListItem>
-              <ListItem href="/pricing" title="Pricing" icon={<DIcons.CreditCard className="h-4 w-4" />}>
+              <ListItem href="/pricing" title="Pricing" icon={<CreditCard className="h-4 w-4" />}>
                 Flexible plans for teams of all sizes.
               </ListItem>
-              <ListItem href="/enterprise" title="Enterprise" icon={<DIcons.Building02 className="h-4 w-4" />}>
+              <ListItem href="/enterprise" title="Enterprise" icon={<Building2 className="h-4 w-4" />}>
                 Custom solutions for large organizations.
               </ListItem>
             </ul>
@@ -112,19 +105,16 @@ export function EnsembleNavigation() {
           <NavigationMenuTrigger>Tools</NavigationMenuTrigger>
           <NavigationMenuContent>
             <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-              {tools.map((tool) => {
-                const Icon = DIcons[tool.icon];
-                return (
-                  <ListItem
-                    key={tool.title}
-                    title={tool.title}
-                    href={tool.href}
-                    icon={<Icon className="h-4 w-4" />}
-                  >
-                    {tool.description}
-                  </ListItem>
-                );
-              })}
+              {tools.map((tool) => (
+                <ListItem
+                  key={tool.title}
+                  title={tool.title}
+                  href={tool.href}
+                  icon={tool.icon}
+                >
+                  {tool.description}
+                </ListItem>
+              ))}
             </ul>
           </NavigationMenuContent>
         </NavigationMenuItem>
@@ -148,13 +138,13 @@ export function EnsembleNavigation() {
           <NavigationMenuTrigger>Team</NavigationMenuTrigger>
           <NavigationMenuContent>
             <ul className="grid gap-3 p-4 md:w-[400px]">
-              <ListItem href="/team/members" title="Team Members" icon={<DIcons.Users className="h-4 w-4" />}>
+              <ListItem href="/team/members" title="Team Members" icon={<Users className="h-4 w-4" />}>
                 Manage your team members and their roles.
               </ListItem>
-              <ListItem href="/team/projects" title="Projects" icon={<DIcons.Folder className="h-4 w-4" />}>
+              <ListItem href="/team/projects" title="Projects" icon={<Folder className="h-4 w-4" />}>
                 Overview of all team projects and their status.
               </ListItem>
-              <ListItem href="/team/settings" title="Settings" icon={<DIcons.Settings className="h-4 w-4" />}>
+              <ListItem href="/team/settings" title="Settings" icon={<Settings className="h-4 w-4" />}>
                 Configure team preferences and permissions.
               </ListItem>
             </ul>

@@ -3,7 +3,7 @@
 import { db } from '@/db';
 import { teams, teamRegistrationRequests } from '@/db/schema';
 import { eq, and, gte, desc } from 'drizzle-orm';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth } from '@/app/(auth)/lib/auth';
 
 export type DashboardStats = {
   totalTeams: number;

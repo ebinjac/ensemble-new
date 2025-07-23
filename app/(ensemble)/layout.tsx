@@ -1,6 +1,7 @@
-import { getServerUser } from "@/lib/auth";
+
 import { Header } from "@/components/home/header";
 import { Suspense } from "react";
+import { getServerUser } from "@/app/(auth)/lib/auth";
 
 // This is the server component that fetches the data
 async function AuthDataProvider() {

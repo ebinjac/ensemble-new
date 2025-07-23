@@ -36,8 +36,8 @@ export function AdminSidebar() {
   return (
     <div className="flex h-screen w-64 flex-col border-r bg-card">
       <div className="flex h-16 items-center border-b px-4">
-        <Link href="/admin" className="flex items-center gap-2 font-semibold">
-          <EnsembleLogo />
+        <Link href="/admin" className="flex items-center gap-2 font-semibold h-12">
+          <EnsembleLogo className=" size-12" />
           <span>Ensemble Admin</span>
         </Link>
       </div>

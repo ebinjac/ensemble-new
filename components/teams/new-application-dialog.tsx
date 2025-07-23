@@ -1,9 +1,9 @@
-'use client';
+"use client"
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Plus, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Plus, Search, Loader2, Building2, User, Mail, Hash, MessageSquare, Settings, CheckCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -11,169 +11,144 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useToast } from "@/components/ui/use-toast";
-import {
-  createApplication,
-  searchCarId,
-} from "@/app/actions/applications";
-import {
-  type ApplicationFormData,
-  applicationSchema,
-} from "@/app/types/application";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+} from "@/components/ui/dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
+import { createApplication, searchCarId } from "@/app/actions/applications"
+import { type ApplicationFormData, applicationSchema } from "@/app/types/application"
+import { useAuth } from "@/app/(auth)/providers/AuthProvider"
 
 interface NewApplicationDialogProps {
-  teamId: string;
+  teamId: string
 }
 
 export default function NewApplicationDialog({ teamId }: NewApplicationDialogProps) {
-  const [open, setOpen] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [applicationData, setApplicationData] = useState<ApplicationFormData | null>(null);
-  const router = useRouter();
-  const { toast } = useToast();
+  const { isTeamAdmin } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [applicationData, setApplicationData] = useState<ApplicationFormData | null>(null)
+  const router = useRouter()
 
   const form = useForm<ApplicationFormData>({
     resolver: zodResolver(applicationSchema),
     defaultValues: {
       teamId,
       carId: "",
-      applicationName: "",
-      tla: "",
-      description: "",
-      tier: 1,
-      vpName: "",
-      vpEmail: "",
-      directorName: "",
-      directorEmail: "",
-      slackChannel: "",
-      snowGroup: "",
     },
-  });
+  })
 
   const searchByCarId = async (carId: string) => {
     if (!carId) {
-      toast({
-        title: "CAR ID is required",
-        variant: "destructive",
-      });
-      return;
+      toast.error("CAR ID is required")
+      return
     }
-    setIsSearching(true);
-    setApplicationData(null);
+    setIsSearching(true)
+    setApplicationData(null)
     try {
-      const result = await searchCarId(carId);
-      
+      const result = await searchCarId(carId)
+
       if (result.success && result.data) {
         const fullData = {
           ...form.getValues(),
           ...result.data,
           carId,
           teamId,
-        };
-        form.reset(fullData);
-        setApplicationData(fullData);
-        toast({
-          title: "Application Found",
-          description: "Review the details below and click 'Create Application'.",
-        });
+        }
+        form.reset(fullData)
+        setApplicationData(fullData)
+        toast("Application Found. Review the details below and click 'Create Application'.")
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to fetch application details",
-          variant: "destructive",
-        });
+        toast.error(result.error || "Failed to fetch application details")
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch application details.",
-        variant: "destructive",
-      });
+      toast.error("Failed to fetch application details.")
     } finally {
-      setIsSearching(false);
+      setIsSearching(false)
     }
-  };
+  }
 
   const onSubmit = async (data: ApplicationFormData) => {
+    setIsSubmitting(true)
     try {
       const result = await createApplication({
         ...data,
         teamId,
-      });
-
+      })
       if (result.success) {
-        toast({
-          title: "Success",
-          description: "Application created successfully",
-        });
-        setOpen(false);
-        router.refresh();
+        toast.success("Application created successfully")
+        setOpen(false)
+        router.refresh()
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to create application",
-          variant: "destructive",
-        });
+        toast.error(result.error || "Failed to create application")
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create application. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to create application. Please try again.")
+    } finally {
+      setIsSubmitting(false)
     }
-  };
+  }
 
-  const carIdValue = form.watch("carId");
+  const carIdValue = form.watch("carId")
+
+  // Only show the dialog trigger if user is admin
+  if (!isTeamAdmin(teamId)) {
+    return (
+      <Button disabled title="Only team admins can add applications">
+        <Plus className="mr-2 h-4 w-4" />
+        New Application
+      </Button>
+    )
+  }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-      setOpen(isOpen);
-      if (!isOpen) {
-        form.reset();
-        setApplicationData(null);
-      }
-    }}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen)
+        if (!isOpen) {
+          form.reset()
+          setApplicationData(null)
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
           New Application
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Add New Application</DialogTitle>
-          <DialogDescription>
-            Add a new application to your team by searching for its CAR ID.
+      <DialogContent className="min-w-[700px] max-h-[90vh] overflow-hidden">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="text-2xl font-semibold">Add New Application</DialogTitle>
+          <DialogDescription className="text-base">
+            Search for an application by CAR ID and add it to your team
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-2">
-                <FormLabel>CAR ID</FormLabel>
-                <div className="flex gap-2">
+        <div className="overflow-y-auto max-h-[calc(90vh-180px)] pr-6 -mr-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
+              {/* Search Section */}
+              <div className="space-y-5">
+                <div className="flex items-center gap-2 text-base font-medium text-muted-foreground">
+                  <Search className="h-5 w-5" />
+                  Search Application
+                </div>
+
+                <div className="flex gap-4">
                   <FormField
                     control={form.control}
                     name="carId"
                     render={({ field }) => (
-                      <FormItem className="flex-grow">
+                      <FormItem className="flex-1">
                         <FormControl>
-                          <Input {...field} placeholder="Enter CAR ID" />
+                          <Input {...field} placeholder="Enter CAR ID (e.g., CAR-12345)" className="h-11 text-base" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -181,72 +156,258 @@ export default function NewApplicationDialog({ teamId }: NewApplicationDialogPro
                   />
                   <Button
                     type="button"
-                    variant="secondary"
+                    size="lg"
                     onClick={() => searchByCarId(carIdValue)}
                     disabled={isSearching || !carIdValue}
+                    className="h-11 px-8"
                   >
-                    <Search className="mr-2 h-4 w-4" />
+                    {isSearching ? (
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    ) : (
+                      <Search className="mr-2 h-5 w-5" />
+                    )}
                     Search
                   </Button>
                 </div>
-            </div>
-            
-            {isSearching && <p className="text-center text-muted-foreground">Searching...</p>}
-            
-            {applicationData && (
-              <Card className="mt-4">
-                <CardHeader>
-                  <CardTitle>{applicationData.applicationName}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <p><strong>TLA:</strong> {applicationData.tla}</p>
-                    <p><strong>Tier:</strong> {applicationData.tier}</p>
-                  </div>
-                  <p><strong>Description:</strong> {applicationData.description}</p>
-                  
-                  <Separator />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-semibold">VP Contact</h4>
-                      <p>{applicationData.vpName}</p>
-                      <p className="text-sm text-muted-foreground">{applicationData.vpEmail}</p>
+                {isSearching && (
+                  <div className="flex items-center justify-center py-10">
+                    <div className="flex items-center gap-3 text-muted-foreground">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Searching for application...</span>
                     </div>
-                    <div>
-                      <h4 className="font-semibold">Director Contact</h4>
-                      <p>{applicationData.directorName}</p>
-                      <p className="text-sm text-muted-foreground">{applicationData.directorEmail}</p>
-                    </div>
+                  </div>
+                )}
+              </div>
+
+              {applicationData && (
+                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">
+                      Application Found
+                    </Badge>
                   </div>
 
                   <Separator />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-semibold">Slack Channel</h4>
-                      <p>{applicationData.slackChannel || 'N/A'}</p>
+                  {/* Basic Information Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 text-lg font-semibold">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      Basic Information
                     </div>
-                    <div>
-                      <h4 className="font-semibold">ServiceNow Group</h4>
-                      <p>{applicationData.snowGroup || 'N/A'}</p>
+
+                    <div className="grid grid-cols-2 gap-8">
+                      <FormField
+                        control={form.control}
+                        name="applicationName"
+                        render={({ field }) => (
+                          <FormItem className="space-y-2.5">
+                            <FormLabel className="text-sm font-medium">Application Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} className="h-11" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="tla"
+                        render={({ field }) => (
+                          <FormItem className="space-y-2.5">
+                            <FormLabel className="text-sm font-medium">TLA</FormLabel>
+                            <FormControl>
+                              <Input {...field} className="h-11" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-8">
+                      <FormField
+                        control={form.control}
+                        name="tier"
+                        render={({ field }) => (
+                          <FormItem className="space-y-2.5">
+                            <FormLabel className="text-sm font-medium flex items-center gap-2">
+                              <Hash className="h-4 w-4" />
+                              Tier
+                            </FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} className="h-11" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem className="space-y-2.5">
+                            <FormLabel className="text-sm font-medium">Description</FormLabel>
+                            <FormControl>
+                              <Input {...field} className="h-11" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!applicationData}>
+                  <Separator />
+
+                  {/* Leadership Team Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 text-lg font-semibold">
+                      <User className="h-5 w-5 text-primary" />
+                      Leadership Team
+                    </div>
+
+                    <div className="space-y-8">
+                      <div className="grid grid-cols-2 gap-8">
+                        <FormField
+                          control={form.control}
+                          name="vpName"
+                          render={({ field }) => (
+                            <FormItem className="space-y-2.5">
+                              <FormLabel className="text-sm font-medium">VP Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} className="h-11" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="vpEmail"
+                          render={({ field }) => (
+                            <FormItem className="space-y-2.5">
+                              <FormLabel className="text-sm font-medium flex items-center gap-2">
+                                <Mail className="h-4 w-4" />
+                                VP Email
+                              </FormLabel>
+                              <FormControl>
+                                <Input {...field} type="email" className="h-11" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-8">
+                        <FormField
+                          control={form.control}
+                          name="directorName"
+                          render={({ field }) => (
+                            <FormItem className="space-y-2.5">
+                              <FormLabel className="text-sm font-medium">Director Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} className="h-11" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="directorEmail"
+                          render={({ field }) => (
+                            <FormItem className="space-y-2.5">
+                              <FormLabel className="text-sm font-medium flex items-center gap-2">
+                                <Mail className="h-4 w-4" />
+                                Director Email
+                              </FormLabel>
+                              <FormControl>
+                                <Input {...field} type="email" className="h-11" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Communication & Tools Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 text-lg font-semibold">
+                      <Settings className="h-5 w-5 text-primary" />
+                      Communication & Tools
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-8">
+                      <FormField
+                        control={form.control}
+                        name="slackChannel"
+                        render={({ field }) => (
+                          <FormItem className="space-y-2.5">
+                            <FormLabel className="text-sm font-medium flex items-center gap-2">
+                              <MessageSquare className="h-4 w-4" />
+                              Slack Channel
+                            </FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="#channel-name" className="h-11" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="snowGroup"
+                        render={({ field }) => (
+                          <FormItem className="space-y-2.5">
+                            <FormLabel className="text-sm font-medium">ServiceNow Group</FormLabel>
+                            <FormControl>
+                              <Input {...field} className="h-11" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </form>
+          </Form>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="flex justify-end gap-4 pt-8 border-t">
+          <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting} size="lg">
+            Cancel
+          </Button>
+          <Button 
+            onClick={form.handleSubmit(onSubmit)} 
+            disabled={!applicationData || isSubmitting}
+            size="lg"
+            className="px-8"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-5 w-5" />
                 Create Application
-              </Button>
-            </div>
-          </form>
-        </Form>
+              </>
+            )}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
-  );
-} 
+  )
+}

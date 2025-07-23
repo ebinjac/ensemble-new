@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth } from '@/app/(auth)/lib/auth';
 import {
   Card,
   CardHeader,

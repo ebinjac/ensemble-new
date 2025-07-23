@@ -1,16 +1,8 @@
-import { TeamRegistrationForm } from "@/components/teams/TeamRegistrationForm"
-import { requireAuth } from "@/lib/auth"
-import type { SSOUser } from "@/app/types/auth"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { TeamRegistrationForm } from "@/components/teams/register/TeamRegistrationForm"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, FileText, ArrowRight, Info, Users, UserCheck, Rocket } from "lucide-react"
+import { MessageSquare, FileText, ArrowRight, Users, UserCheck, Rocket } from "lucide-react"
 
 export default async function TeamRegistrationPage() {
-  const jwt = await requireAuth()
-  const user: SSOUser = {
-    ...jwt.user,
-    groups: jwt.groups,
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -69,7 +61,7 @@ export default async function TeamRegistrationPage() {
             </div>
 
             <div className=" rounded-lg py-12 border border-border">
-              <TeamRegistrationForm user={user} />
+              <TeamRegistrationForm />
             </div>
           </div>
 

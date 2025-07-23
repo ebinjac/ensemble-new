@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { applications } from "@/db/schema";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth } from "@/app/(auth)/lib/auth";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import {
@@ -92,7 +92,7 @@ export async function createApplication(data: ApplicationFormData) {
     const uniqueTLA = await ensureUniqueTLA(validatedData.teamId, baseTLA);
 
     // Create new application with generated TLA
-    const newApplication = await db.insert(applications).values({
+    await db.insert(applications).values({
       ...validatedData,
       tla: uniqueTLA,
       createdBy: user.user.email,
@@ -100,7 +100,7 @@ export async function createApplication(data: ApplicationFormData) {
     });
 
     revalidatePath(`/teams/${data.teamId}`);
-    return { success: true, data: newApplication };
+    return { success: true };
   } catch (error) {
     console.error("Failed to create application:", error);
     return { 
@@ -152,5 +152,68 @@ export async function searchCarId(carId: string) {
       success: false, 
       error: error instanceof Error ? error.message : "Failed to search CAR ID" 
     };
+  }
+}
+
+export async function updateApplication(id: string, data: Partial<Omit<ApplicationFormData, 'carId' | 'teamId'>>) {
+  try {
+    const user = await requireAuth();
+    // Find the application and check team access
+    const app = await db.select().from(applications).where(eq(applications.id, id)).execute();
+    if (!app.length) throw new Error('Application not found');
+    const teamId = app[0].teamId;
+    const hasTeamAccess = user.teams?.some(team => team.teamId === teamId);
+    if (!hasTeamAccess) throw new Error("You don't have access to this team");
+    // Update application (except carId, teamId)
+    await db.update(applications)
+      .set({ ...data, updatedBy: user.user.fullName })
+      .where(eq(applications.id, id));
+    revalidatePath(`/teams/${teamId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update application:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to update application' };
+  }
+}
+
+export async function deleteApplication(id: string) {
+  try {
+    const user = await requireAuth();
+    // Find the application and check team access
+    const app = await db.select().from(applications).where(eq(applications.id, id)).execute();
+    if (!app.length) throw new Error('Application not found');
+    const teamId = app[0].teamId;
+    const hasTeamAccess = user.teams?.some(team => team.teamId === teamId);
+    if (!hasTeamAccess) throw new Error("You don't have access to this team");
+    await db.delete(applications).where(eq(applications.id, id));
+    revalidatePath(`/teams/${teamId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete application:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to delete application' };
+  }
+}
+
+export async function refreshApplication(id: string) {
+  try {
+    const user = await requireAuth();
+    // Find the application and check team access
+    const app = await db.select().from(applications).where(eq(applications.id, id)).execute();
+    if (!app.length) throw new Error('Application not found');
+    const teamId = app[0].teamId;
+    const carId = app[0].carId;
+    const hasTeamAccess = user.teams?.some(team => team.teamId === teamId);
+    if (!hasTeamAccess) throw new Error("You don't have access to this team");
+    // Fetch latest details from central API
+    const result = await searchCarId(carId);
+    if (!result.success || !result.data) throw new Error(result.error || 'Failed to refresh from central API');
+    await db.update(applications)
+      .set({ ...result.data, updatedBy: user.user.email })
+      .where(eq(applications.id, id));
+    revalidatePath(`/teams/${teamId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to refresh application:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to refresh application' };
   }
 }

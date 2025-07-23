@@ -1,5 +1,5 @@
 
-import { getServerUser } from "@/lib/auth"
+import { getServerUser } from "@/app/(auth)/lib/auth"
 import { getAllTeams } from "@/app/actions/teams"
 import { Hero } from "@/components/home/hero"
 

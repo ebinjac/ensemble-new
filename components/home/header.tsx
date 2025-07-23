@@ -44,8 +44,8 @@ export function Header({ user, teams }: HeaderProps) {
       <div className="mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8 max-w-[1400px]">
         {/* Logo */}
         <Link href="/" className="flex items-center space-x-2">
-          <div className="flex items-center h-16">
-            <EnsembleLogo />
+          <div className="flex items-center h-12">
+            <EnsembleLogo className=" size-12" />
           </div>
         </Link>
 
@@ -75,7 +75,7 @@ export function Header({ user, teams }: HeaderProps) {
                     {teams.map((team) => (
                       <DropdownMenuItem key={team.id} asChild>
                         <Link
-                          href={`/dashboard/${team.id}`}
+                          href={`/teams/${team.id}`}
                           className="flex w-full items-center"
                         >
                           <DIcons.Folder className="mr-2 h-4 w-4" />

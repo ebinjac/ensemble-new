@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from "./providers/AuthProvider";
-import { ThemeProvider } from "./providers/ThemeProvider";
 import { Toaster } from "sonner";
-import { bentonSans } from "./fonts";
+import { bentonSans } from "@/lib/fonts";
+import { Providers } from "@/providers/RootProviders";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -18,17 +17,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={bentonSans.className}>
       <body className="antialiased" >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthProvider>
-            {children}
-            <Toaster />
-          </AuthProvider>
-        </ThemeProvider>
+        <Providers>
+          {children}
+          <Toaster />
+        </Providers>
       </body>
     </html>
   );
