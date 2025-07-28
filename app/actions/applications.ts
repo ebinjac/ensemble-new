@@ -1,8 +1,10 @@
+// app/actions/applications.ts
+
 'use server';
 
 import { db } from "@/db";
-import { applications } from "@/db/schema";
-import { requireAuth } from "@/app/(auth)/lib/auth";
+import { applications } from "@/db/schema/teams";
+import { requireAuth, requireTeamAccess } from "@/app/(auth)/lib/auth";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import {
@@ -215,5 +217,47 @@ export async function refreshApplication(id: string) {
   } catch (error) {
     console.error('Failed to refresh application:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Failed to refresh application' };
+  }
+}
+
+export async function getTeamApplications(teamId: string) {
+  try {
+    const { user } = await requireTeamAccess(teamId, { admin: false });
+
+    const apps = await db
+      .select({
+        id: applications.id,
+        applicationName: applications.applicationName,
+        carId: applications.carId,
+        tla: applications.tla,
+        tier: applications.tier,
+        status: applications.status,
+      })
+      .from(applications)
+      .where(eq(applications.teamId, teamId))
+      .orderBy(applications.applicationName);
+
+    return apps;
+
+  } catch (error) {
+    console.error('Get team applications error:', error);
+    throw new Error('Failed to fetch applications');
+  }
+}
+
+export async function getApplicationsByTeam(teamId: string) {
+  const { user } = await requireAuth();
+  
+  try {
+    const apps = await db
+      .select()
+      .from(applications)
+      .where(eq(applications.teamId, teamId))
+      .orderBy(applications.applicationName);
+
+    return apps;
+  } catch (error) {
+    console.error('Error fetching applications by team:', error);
+    throw new Error('Failed to fetch applications');
   }
 }

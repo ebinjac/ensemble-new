@@ -1,3 +1,5 @@
+// app/(auth)/hooks/useSSOPolicy.ts
+
 import { useEffect, useState } from 'react';
 import type { SSOUser } from '@/app/types/auth';
 

@@ -165,7 +165,7 @@ export class StatelessSessionManager {
       return {
         accessToken,
         refreshToken,
-        expiresAt: now + (15 * 60 * 1000), // 15 minutes
+        expiresAt: now + (24 * 60 * 60 * 1000), // 24 hours
       };
     } catch (error) {
       if (error instanceof Error) {
@@ -273,7 +273,7 @@ export class StatelessSessionManager {
 
       return {
         accessToken: newAccessToken,
-        expiresAt: now + (15 * 60 * 1000), // 15 minutes
+        expiresAt: now + (24 * 60 * 60 * 1000), // 24 hours
       };
     } catch (error) {
       console.error('❌ Session refresh failed:', error);

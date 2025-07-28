@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAuth } from "@/app/(auth)/lib/auth";
 import { db } from "@/db";
-import { teams, applications } from "@/db/schema";
+import { teams, applications } from "@/db/schema/teams";
 import { eq } from "drizzle-orm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

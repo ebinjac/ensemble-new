@@ -1,10 +1,9 @@
-// app/actions/auth.ts
 'use server';
 
 import { cookies } from 'next/headers';
 
 import { db } from '@/db';
-import { teams } from '@/db/schema';
+import { teams } from '@/db/schema/teams';
 import { eq, or } from 'drizzle-orm';
 import type { SSOUser, AuthResponse, TeamAccess } from '@/app/types/auth';
 import { getUserTeamAccess } from '../lib/team-utils';
@@ -50,7 +49,7 @@ export async function handleSSOCallback(
       secure: isProduction,
       sameSite: 'lax',
       path: '/',
-      maxAge: 15 * 60, // 15 minutes
+      maxAge: 24 * 60 * 60, // 24 hours
     });
 
     cookieStore.set('refresh-token', tokens.refreshToken, {
@@ -111,7 +110,7 @@ export async function refreshAuthToken(): Promise<{ success: boolean; error?: st
       secure: isProduction,
       sameSite: 'lax',
       path: '/',
-      maxAge: 15 * 60, // 15 minutes
+      maxAge: 24 * 60 * 60, // 24 hours
     });
 
     console.log('✅ Access token refreshed successfully');

@@ -1,4 +1,6 @@
-// lib/auth.ts
+// app/(auth)/lib/auth.ts
+'use server';
+
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { StatelessSessionManager, type SessionPayload } from '@/app/(auth)/lib/token';
@@ -145,7 +147,7 @@ export async function checkTeamAccess(teamId: string): Promise<{
 /**
  * Require team access for a specific team
  */
-export async function requireTeamAccess(teamId: string): Promise<{
+export async function requireTeamAccess(teamId: string, p0: { admin: boolean; }): Promise<{
   user: SessionPayload;
   role: 'admin' | 'user';
 }> {

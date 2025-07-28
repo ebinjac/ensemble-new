@@ -1,6 +1,6 @@
 // lib/team-utils.ts
 import { db } from '@/db';
-import { teams } from '@/db/schema';
+import { teams } from '@/db/schema/teams';
 import { eq, or } from 'drizzle-orm';
 import type { TeamAccess } from '@/app/types/auth';
 

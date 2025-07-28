@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/db';
-import { teams, teamRegistrationRequests } from '@/db/schema';
+import { teams, teamRegistrationRequests } from '@/db/schema/teams';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { requireAuth } from '@/app/(auth)/lib/auth';
@@ -64,7 +64,7 @@ export async function registerTeam(data: TeamRegistrationData) {
       contactEmail: data.contactEmail,
       requestedBy: requestedBy,
       status: 'pending' as const,
-      requestedAt: new Date(),
+      requestedAt: new Date(),  
       reviewedBy: null,
       reviewedAt: null,
       comments: null

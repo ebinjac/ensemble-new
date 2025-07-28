@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import type { applications } from "@/db/schema"
+import type { applications } from "@/db/schema/teams"
 import { useState, useMemo } from "react"
 import {
   Pencil,

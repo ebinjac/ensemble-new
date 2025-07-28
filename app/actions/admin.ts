@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/db';
-import { teams, teamRegistrationRequests } from '@/db/schema';
+import { teams, teamRegistrationRequests } from '@/db/schema/teams';
 import { eq, and, gte, desc } from 'drizzle-orm';
 import { requireAuth } from '@/app/(auth)/lib/auth';
 

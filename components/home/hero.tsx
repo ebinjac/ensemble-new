@@ -56,7 +56,7 @@ export function Hero() {
               variants={itemVariants}
               className="z-10 mb-6 sm:justify-center md:mb-8"
             >
-              <div className="relative flex items-center whitespace-nowrap rounded-full border bg-popover/80 backdrop-blur-sm px-4 py-1.5 text-sm leading-6 text-primary/80">
+              <div className="relative flex items-center whitespace-nowrap rounded-full border bg-popover/80 backdrop-blur-sm px-4 py-1.5 text-sm leading-6 text-black dark:text-white">
                 <DIcons.Shapes className="h-5 p-1" />
                 <span className="flex items-center gap-2">
                   Ensemble Portal is now beta
@@ -70,34 +70,34 @@ export function Hero() {
 
             {/* Main Heading Container */}
             <motion.div variants={itemVariants} className="px-2 w-full">
-              <div className="border-primary/20 relative mx-auto h-full max-w-7xl border p-6 [mask-image:radial-gradient(800rem_96rem_at_center,white,transparent)] md:px-12 md:py-20">
+              <div className="border-black/20 dark:border-white/20 relative mx-auto h-full max-w-7xl border p-6 [mask-image:radial-gradient(800rem_96rem_at_center,white,transparent)] md:px-12 md:py-20">
                 <motion.div
                   variants={iconVariants}
-                  className="text-primary absolute -left-5 -top-5"
+                  className="text-black dark:text-white absolute -left-5 -top-5"
                 >
                   <DIcons.Plus strokeWidth={4} className="h-10 w-10" />
                 </motion.div>
                 <motion.div
                   variants={iconVariants}
-                  className="text-primary absolute -bottom-5 -left-5"
+                  className="text-black dark:text-white absolute -bottom-5 -left-5"
                 >
                   <DIcons.Plus strokeWidth={4} className="h-10 w-10" />
                 </motion.div>
                 <motion.div
                   variants={iconVariants}
-                  className="text-primary absolute -right-5 -top-5"
+                  className="text-black dark:text-white absolute -right-5 -top-5"
                 >
                   <DIcons.Plus strokeWidth={4} className="h-10 w-10" />
                 </motion.div>
                 <motion.div
                   variants={iconVariants}
-                  className="text-primary absolute -bottom-5 -right-5"
+                  className="text-black dark:text-white absolute -bottom-5 -right-5"
                 >
                   <DIcons.Plus strokeWidth={4} className="h-10 w-10" />
                 </motion.div>
                 
                 <motion.h1 
-                  className="text-4xl font-bold tracking-tight md:text-7xl lg:text-8xl bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70"
+                  className="text-4xl font-bold tracking-tight md:text-7xl lg:text-8xl bg-clip-text text-transparent bg-gradient-to-r from-black via-black/60 to-black/70 dark:from-white dark:via-white/60 dark:to-white/70"
                   initial={{ scale: 0.95 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.2 }}
@@ -110,7 +110,7 @@ export function Hero() {
             {/* Subtitle */}
             <motion.p
               variants={itemVariants}
-              className="mx-auto mt-6 max-w-2xl text-lg text-primary/60 md:text-xl"
+              className="mx-auto mt-6 max-w-2xl text-lg text-black/60 dark:text-white/60 md:text-xl"
             >
               Reduce manual effort, boost productivity, and centralize your operational tools with Ensemble.
             </motion.p>

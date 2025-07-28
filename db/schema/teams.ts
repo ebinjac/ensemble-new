@@ -95,7 +95,7 @@ export const applications = pgTable("applications", {
   
   // Additional metadata
   description: text("description"),
-  status: applicationStatus("status").notNull().default('pending'),
+  status: applicationStatus("status").notNull().default('active'),
   
   // Audit fields
   createdBy: varchar("created_by", { length: 255 }).notNull(),

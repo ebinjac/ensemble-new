@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
   Type,
   Heading,
@@ -50,9 +50,17 @@ import {
   Save,
   Check,
   FileText,
-  Layers
+  Layers,
+  Loader2,
+  Search,
+  X
 } from 'lucide-react';
 import EnsembleLogo from '../home/logo';
+import { getTemplateLibrary, getTemplateLibraryWithComponents, getComponentLibrary, incrementTemplateUsage } from '@/app/actions/bluemailer/library';
+import { useParams } from 'next/navigation';
+import { getLibraryItemWithComponents, getTeamLibraryItems } from '@/app/actions/bluemailer/team-library';
+import { Badge } from '../ui/badge';
+
 
 // Enhanced Number Input Component
 interface NumberInputProps {
@@ -1386,205 +1394,371 @@ interface TemplateLibraryModalProps {
   onClose: () => void;
   onSelectTemplate: (template: any) => void;
   onSelectComponent: (component: any) => void;
+  teamId: string; // Add teamId prop
 }
 
-function TemplateLibraryModal({ isOpen, onClose, onSelectTemplate, onSelectComponent }: TemplateLibraryModalProps) {
-  const [activeTab, setActiveTab] = useState<'templates' | 'components'>('templates');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [previewTemplate, setPreviewTemplate] = useState<any>(null);
+// Define types for the library items
+interface GlobalTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  thumbnailUrl: string | null;
+  usageCount: number;
+  rating: number;
+  isFeatured: boolean;
+  createdAt: Date;
+}
 
-  const templateCategories = ['all', ...Array.from(new Set(Object.values(TEMPLATE_LIBRARY).map(t => t.category)))];
-  const componentCategories = ['headers', 'cta', 'footers'];
+interface TeamLibraryItem {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  visibility: 'private' | 'team' | 'public';
+  thumbnailUrl: string | null;
+  isComponent: boolean;
+  usageCount: number;
+  rating: number;
+  isFeatured: boolean;
+  createdAt: Date;
+  createdBy: string;
+  teamId: string | null;
+}
+
+
+function TemplateLibraryModal({
+  isOpen,
+  onClose,
+  onSelectTemplate,
+  onSelectComponent
+}: TemplateLibraryModalProps) {
+  const { teamId } = useParams();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'global' | 'team'>('global');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Data state - HERE ARE THE MISSING useState DECLARATIONS
+  const [globalTemplates, setGlobalTemplates] = useState<GlobalTemplate[]>([]);
+  const [teamLibraryItems, setTeamLibraryItems] = useState<TeamLibraryItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Load data when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadLibraryData();
+    }
+  }, [isOpen, teamId]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setActiveTab('global');
+      setSelectedCategory('all');
+      setSearchQuery('');
+    }
+  }, [isOpen]);
+
+  const loadLibraryData = async () => {
+    setLoading(true);
+    try {
+      const [globalTemplates, teamLibraryItems] = await Promise.all([
+        getTemplateLibrary(), // Global templates
+        getTeamLibraryItems(teamId as string) // Team + public templates
+      ]);
+
+      setGlobalTemplates(globalTemplates);
+      setTeamLibraryItems(teamLibraryItems);
+    } catch (error) {
+      console.error('Error loading library data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter functions
+  const filterGlobalTemplates = () => {
+    return globalTemplates.filter(template => {
+      const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        template.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  };
+
+  const filterTeamLibraryItems = () => {
+    return teamLibraryItems.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+      const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  };
+
+  // Selection handlers
+  const handleGlobalTemplateSelect = async (template: GlobalTemplate) => {
+    try {
+      const fullTemplate = await getTemplateLibraryWithComponents(template.id);
+      if (fullTemplate) {
+        await incrementTemplateUsage(template.id, teamId as string);
+        onSelectTemplate(fullTemplate);
+        onClose();
+      }
+    } catch (error) {
+      console.error('Error selecting global template:', error);
+    }
+  };
+
+  const handleTeamItemSelect = async (item: TeamLibraryItem) => {
+    try {
+      const fullItem = await getLibraryItemWithComponents(item.id, teamId as string);
+      if (fullItem) {
+        await incrementTemplateUsage(item.id, teamId as string);
+
+        if (item.isComponent) {
+          // If it's a component, pass to component handler
+          onSelectComponent(fullItem.components[0] || fullItem);
+        } else {
+          // If it's a template, pass to template handler
+          onSelectTemplate(fullItem);
+        }
+        onClose();
+      }
+    } catch (error) {
+      console.error('Error selecting team library item:', error);
+    }
+  };
+
+  // Get categories for filtering
+  const globalCategories = ['all', ...Array.from(new Set(globalTemplates.map(t => t.category)))];
+  const teamCategories = ['all', ...Array.from(new Set(teamLibraryItems.map(t => t.category)))];
+  const availableCategories = activeTab === 'global' ? globalCategories : teamCategories;
+
+  // Render template card
+  const renderGlobalTemplateCard = (template: GlobalTemplate) => (
+    <div
+      key={template.id}
+      className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group bg-white"
+      onClick={() => handleGlobalTemplateSelect(template)}
+    >
+      <div className="aspect-[3/4] relative overflow-hidden bg-gray-50">
+        {template.thumbnailUrl ? (
+          <img
+            src={template.thumbnailUrl}
+            alt={template.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-400">
+            <FileText className="h-12 w-12" />
+          </div>
+        )}
+        {template.isFeatured && (
+          <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded text-xs font-medium">
+            Featured
+          </div>
+        )}
+      </div>
+
+      <div className="p-4">
+        <h3 className="font-semibold text-sm mb-1">{template.name}</h3>
+        <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{template.description}</p>
+        <div className="flex items-center justify-between">
+          <Badge variant="outline" className="text-xs">
+            {template.category}
+          </Badge>
+          {template.usageCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {template.usageCount} uses
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render team library item card
+  const renderTeamLibraryCard = (item: TeamLibraryItem) => (
+    <div
+      key={item.id}
+      className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group bg-white"
+      onClick={() => handleTeamItemSelect(item)}
+    >
+      <div className="aspect-[3/4] relative overflow-hidden bg-gray-50">
+        {item.thumbnailUrl ? (
+          <img
+            src={item.thumbnailUrl}
+            alt={item.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-400">
+            {item.isComponent ? (
+              <Layers className="h-12 w-12" />
+            ) : (
+              <FileText className="h-12 w-12" />
+            )}
+          </div>
+        )}
+
+        {/* Visibility indicator */}
+        <div className="absolute top-2 left-2">
+          <Badge
+            variant="secondary"
+            className={`text-xs ${item.visibility === 'public' ? 'bg-green-100 text-green-800' :
+                item.visibility === 'team' ? 'bg-blue-100 text-blue-800' :
+                  'bg-gray-100 text-gray-800'
+              }`}
+          >
+            {item.visibility}
+          </Badge>
+        </div>
+
+        {item.isFeatured && (
+          <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded text-xs font-medium">
+            Featured
+          </div>
+        )}
+      </div>
+
+      <div className="p-4">
+        <h3 className="font-semibold text-sm mb-1">{item.name}</h3>
+        <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+          {item.description || 'No description'}
+        </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-1">
+            <Badge variant="outline" className="text-xs">
+              {item.category}
+            </Badge>
+            {item.isComponent && (
+              <Badge variant="secondary" className="text-xs">
+                Component
+              </Badge>
+            )}
+          </div>
+          {item.usageCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {item.usageCount} uses
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const filteredGlobalTemplates = filterGlobalTemplates();
+  const filteredTeamItems = filterTeamLibraryItems();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl min-w-[90vw] h-[80vh] p-0 gap-0">
-        {/* Header */}
-        <DialogHeader className="px-6 py-4 border-b bg-card">
+      <DialogContent className="max-w-7xl min-w-[90vw] h-[85vh] p-0 gap-0">
+        <DialogHeader className="p-6 pb-4 border-b">
           <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center space-x-2">
-              <Layout className="h-5 w-5" />
-              <span>Template & Component Library</span>
-            </DialogTitle>
-
-            {/* Tab Switcher */}
-            <div className="flex bg-muted rounded-lg p-1">
-              <Button
-                variant={activeTab === 'templates' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveTab('templates')}
-                className="px-4"
-              >
-                <FileText className="h-4 w-4 mr-1" />
-                Templates
-              </Button>
-              <Button
-                variant={activeTab === 'components' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveTab('components')}
-                className="px-4"
-              >
-                <Layers className="h-4 w-4 mr-1" />
-                Components
-              </Button>
+            <div>
+              <DialogTitle className="text-xl">Template Library</DialogTitle>
+              <DialogDescription>
+                Choose from global templates or your team's custom library
+              </DialogDescription>
             </div>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </DialogHeader>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar */}
-          <div className="w-48 border-r bg-card p-4">
-            <Label className="text-sm font-medium text-muted-foreground mb-2 block">
-              {activeTab === 'templates' ? 'Categories' : 'Sections'}
-            </Label>
-            <div className="space-y-1">
-              {(activeTab === 'templates' ? templateCategories : componentCategories).map((category) => (
-                <Button
-                  key={category}
-                  variant={selectedCategory === category ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setSelectedCategory(category)}
-                  className="w-full justify-start text-left"
-                >
-                  {category.charAt(0).toUpperCase() + category.slice(1)}
-                </Button>
-              ))}
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
+              <p>Loading library...</p>
             </div>
           </div>
+        ) : (
+          <div className="flex flex-1 overflow-hidden">
+            {/* Sidebar */}
+            <div className="w-64 border-r bg-card p-4 overflow-y-auto">
+              {/* Search */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
 
-          {/* Content Area */}
-          <div className="flex-1 p-6 overflow-y-auto">
-            {activeTab === 'templates' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {Object.values(TEMPLATE_LIBRARY)
-                  .filter(template => selectedCategory === 'all' || template.category === selectedCategory)
-                  .map((template) => (
-                    <div
-                      key={template.id}
-                      className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group bg-white"
-                      onClick={() => {
-                        onSelectTemplate(template);
-                        onClose();
-                      }}
+              {/* Categories */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Categories</h4>
+                <div className="space-y-1">
+                  {availableCategories.map((category) => (
+                    <Button
+                      key={category}
+                      variant={selectedCategory === category ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setSelectedCategory(category)}
+                      className="w-full justify-start text-left capitalize"
                     >
-                      {/* Replace the placeholder image with actual preview */}
-                      <div className="aspect-[3/4] relative overflow-hidden bg-gray-50">
-                        <TemplatePreviewRenderer
-                          template={template}
-                          className="w-full h-full"
-                        />
-                        <div className=" bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button size="sm" className="bg-white text-black hover:bg-gray-100">
-                              Use Template
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-semibold text-sm mb-1">{template.name}</h3>
-                        <p className="text-xs text-muted-foreground mb-2">{template.description}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                            {template.category}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 px-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Open preview in new modal or expand current preview
-                              setPreviewTemplate(template);
-                            }}
-                          >
-                            Preview
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
+                      {category}
+                    </Button>
                   ))}
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {componentCategories
-                  .filter(category => selectedCategory === category || selectedCategory === 'all')
-                  .map((category) => (
-                    <div key={category}>
-                      <h3 className="text-lg font-semibold mb-4 capitalize">{category}</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {COMPONENT_LIBRARY[category as keyof typeof COMPONENT_LIBRARY]?.map((comp) => (
-                          <div
-                            key={comp.id}
-                            className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('prebuiltComponent', JSON.stringify(comp.component));
-                            }}
-                            onClick={() => {
-                              onSelectComponent(comp.component);
-                              onClose();
-                            }}
-                          >
-                            <div className="aspect-[5/2] relative overflow-hidden bg-gray-50">
-                              <ComponentPreviewRenderer
-                                component={comp.component}
-                                width={200}
-                                height={80}
-                              />
-                              <div className="absolute inset-0 bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs bg-white px-2 py-1 rounded shadow">
-                                  Drag or Click
-                                </div>
-                              </div>
-                            </div>
-                            <div className="p-3">
-                              <h4 className="font-medium text-sm">{comp.name}</h4>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-      {previewTemplate && (
-        <Dialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
-          <DialogContent className="max-w-4xl min-w-[90vw] max-h-[80vh] p-0 gap-0">
-            <DialogHeader className="px-6 py-4 border-b">
-              <div className="flex items-center justify-between">
-                <DialogTitle>{previewTemplate.name} Preview</DialogTitle>
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={() => {
-                      onSelectTemplate(previewTemplate);
-                      setPreviewTemplate(null);
-                      onClose();
-                    }}
-                  >
-                    Use This Template
-                  </Button>
-                </div>
-              </div>
-            </DialogHeader>
-            <div className="flex-1 bg-gradient-to-br from-slate-100 to-slate-200 p-6 overflow-auto">
-              <div className="flex justify-center">
-                <div className="bg-white rounded-lg shadow-lg" style={{ width: '600px', height: '800px' }}>
-                  <TemplatePreviewRenderer
-                    template={previewTemplate}
-                    width={600}
-                    height={800}
-                    className="w-full"
-                  />
                 </div>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
+
+            {/* Main content */}
+            <div className="flex-1 overflow-hidden">
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'global' | 'team')}>
+                <div className="border-b px-6 py-3">
+                  <TabsList>
+                    <TabsTrigger value="global">
+                      Global Templates ({filteredGlobalTemplates.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="team">
+                      Team Library ({filteredTeamItems.length})
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <div className="p-6 overflow-y-auto h-full">
+                  <TabsContent value="global" className="mt-0">
+                    {filteredGlobalTemplates.length === 0 ? (
+                      <div className="text-center py-12">
+                        <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p className="text-gray-500">No global templates found</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                        {filteredGlobalTemplates.map(renderGlobalTemplateCard)}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="team" className="mt-0">
+                    {filteredTeamItems.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Layers className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p className="text-gray-500">No team library items found</p>
+                        <p className="text-sm text-gray-400 mt-1">
+                          Create templates and components in your team library
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                        {filteredTeamItems.map(renderTeamLibraryCard)}
+                      </div>
+                    )}
+                  </TabsContent>
+                </div>
+              </Tabs>
+            </div>
+          </div>
+        )}
+      </DialogContent>
     </Dialog>
   );
 }
@@ -1596,7 +1770,7 @@ interface TemplatePreviewProps {
   className?: string;
 }
 
-function TemplatePreviewRenderer({ template , className = "" }: TemplatePreviewProps) {
+function TemplatePreviewRenderer({ template, className = "" }: TemplatePreviewProps) {
   const [previewHtml, setPreviewHtml] = useState<string>('');
 
 
@@ -1714,20 +1888,25 @@ function TemplatePreviewRenderer({ template , className = "" }: TemplatePreviewP
               const buttonStyles = {
                 backgroundColor: buttonComp.styles?.backgroundColor || '#3b82f6',
                 color: buttonComp.styles?.color || '#ffffff',
-                fontSize: '12px', // Fixed smaller size for preview
+                fontSize: '12px',
                 fontFamily: buttonComp.styles?.fontFamily || 'Arial, sans-serif',
                 fontWeight: buttonComp.styles?.fontWeight || '500',
                 textDecoration: 'none',
                 display: 'inline-block',
-                padding: '8px 16px', // Smaller padding for preview
+                padding: '8px 16px',
+                // ADD BORDER STYLES HERE TOO
+                border: buttonComp.styles?.borderWidth && buttonComp.styles?.borderWidth !== '0px'
+                  ? `${buttonComp.styles.borderWidth} ${buttonComp.styles?.borderStyle || 'solid'} ${buttonComp.styles?.borderColor || '#3b82f6'}`
+                  : 'none',
                 borderRadius: buttonComp.styles?.borderRadius || '4px',
-                border: 'none',
+                boxShadow: buttonComp.styles?.boxShadow || 'none',
                 cursor: 'pointer'
               };
 
               return `<div style="${stylesToString(buttonContainerStyles)}">
-                <a href="#" style="${stylesToString(buttonStyles)}">${buttonComp.text || 'Click Here'}</a>
-              </div>`;
+                  <a href="#" style="${stylesToString(buttonStyles)}">${buttonComp.text || 'Click Here'}</a>
+                </div>`;
+
 
             case 'divider':
               const dividerStyles = {
@@ -1987,10 +2166,6 @@ function ComponentPreviewRenderer({ component, width = 200, height = 80 }: Compo
 }
 
 
-
-
-
-
 // Enhanced Component Types with comprehensive default styles
 const COMPONENT_TYPES: Record<string, ComponentType> = {
   // Basic Components with enhanced styling
@@ -2161,7 +2336,21 @@ const COMPONENT_TYPES: Record<string, ComponentType> = {
       height: '16px',
       styles: {
         height: '16px',
-        boxShadow: 'none',
+        backgroundColor: 'transparent',
+        marginTop: '0px',
+        marginRight: '0px',
+        marginBottom: '0px',
+        marginLeft: '0px',
+        paddingTop: '0px',
+        paddingRight: '0px',
+        paddingBottom: '0px',
+        paddingLeft: '0px',
+        borderRadius: '0px',
+        borderWidth: '0px',
+        borderStyle: 'none',
+        borderColor: '#cccccc',
+        opacity: '1',
+        boxShadow: 'none'
       }
     }
   },
@@ -2440,6 +2629,8 @@ export default function EmailEditor({
   onExport,
   readOnly = false
 }: EmailEditorProps) {
+
+
   const [components, setComponents] = useState<EmailComponent[]>(initialTemplate?.components || []);
   const [canvasSettings, setCanvasSettings] = useState<CanvasSettings>(
     initialTemplate?.canvasSettings || DEFAULT_CANVAS_SETTINGS
@@ -2457,6 +2648,7 @@ export default function EmailEditor({
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
   const [draggedComponentType, setDraggedComponentType] = useState<string | null>(null);
 
+  const { teamId } = useParams(); // Get teamId from URL params
   // Add to state declarations
   const [isTemplateLibraryOpen, setIsTemplateLibraryOpen] = useState(false);
 
@@ -2474,6 +2666,8 @@ export default function EmailEditor({
     console.log('Saving template:', template); // Debug log
     onSave(template);
   }, [components, canvasSettings, onSave, initialTemplate]);
+
+
 
   const formatTimeAgo = (date: Date): string => {
     const now = new Date();
@@ -2493,6 +2687,7 @@ export default function EmailEditor({
   };
 
   // Auto-save functionality (optional)
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -2503,16 +2698,20 @@ export default function EmailEditor({
 
   // Auto-save every 30 seconds if there are unsaved changes
   useEffect(() => {
-    if (!hasUnsavedChanges || !onSave || readOnly) return;
+    if (components.length > 0 && hasUnsavedChanges) {
+      setSaveStatus('unsaved');
 
-    const autoSaveInterval = setInterval(() => {
-      handleSave();
-      setHasUnsavedChanges(false);
-      setLastSaved(new Date());
-    }, 30000); // 30 seconds
+      const saveTimeout = setTimeout(() => {
+        setSaveStatus('saving');
+        handleSave();
+        setHasUnsavedChanges(false);
+        setLastSaved(new Date());
+        setSaveStatus('saved');
+      }, 2000); // Save 2 seconds after last change
 
-    return () => clearInterval(autoSaveInterval);
-  }, [hasUnsavedChanges, handleSave, onSave, readOnly]);
+      return () => clearTimeout(saveTimeout);
+    }
+  }, [components, hasUnsavedChanges, handleSave]);
 
   // Manual save handler with feedback
   const handleManualSave = useCallback(() => {
@@ -3078,8 +3277,8 @@ export default function EmailEditor({
         case 'button':
           const buttonComp = component as ButtonComponent;
 
-          // Container styles for layout
-          const ButtonContainerStyles = {
+          // Container styles for alignment only
+          const buttonContainerStyles = {
             textAlign: buttonComp.styles?.textAlign || 'left',
             marginTop: buttonComp.styles?.marginTop,
             marginRight: buttonComp.styles?.marginRight,
@@ -3091,40 +3290,65 @@ export default function EmailEditor({
             paddingLeft: buttonComp.styles?.paddingLeft
           };
 
-          // Button-specific styles
+          // Button-specific styles - INCLUDING BORDERS
           const buttonStyles = {
-            backgroundColor: buttonComp.styles?.backgroundColor,
-            color: buttonComp.styles?.color,
-            fontSize: buttonComp.styles?.fontSize,
-            fontFamily: buttonComp.styles?.fontFamily,
-            fontWeight: buttonComp.styles?.fontWeight,
+            backgroundColor: buttonComp.styles?.backgroundColor || '#007bff',
+            color: buttonComp.styles?.color || '#ffffff',
+            fontSize: buttonComp.styles?.fontSize || '16px',
+            fontFamily: buttonComp.styles?.fontFamily || 'Arial, sans-serif',
+            fontWeight: buttonComp.styles?.fontWeight || '500',
             fontStyle: buttonComp.styles?.fontStyle,
             textDecoration: 'none',
             display: 'inline-block',
-            padding: buttonComp.styles?.padding || '12px 24px', // Use component padding or default
-            borderRadius: buttonComp.styles?.borderRadius,
+            padding: buttonComp.styles?.padding || '12px 24px',
+            // ADD ALL BORDER STYLES TO BUTTON ELEMENT
             border: buttonComp.styles?.border,
             borderWidth: buttonComp.styles?.borderWidth,
             borderStyle: buttonComp.styles?.borderStyle,
             borderColor: buttonComp.styles?.borderColor,
+            borderRadius: buttonComp.styles?.borderRadius || '4px',
             boxShadow: buttonComp.styles?.boxShadow,
             opacity: buttonComp.styles?.opacity,
             cursor: 'pointer',
             textTransform: buttonComp.styles?.textTransform,
             letterSpacing: buttonComp.styles?.letterSpacing,
-            lineHeight: buttonComp.styles?.lineHeight
+            lineHeight: buttonComp.styles?.lineHeight,
+            transition: 'all 0.3s ease'
           };
 
-          return `<div style="${stylesToString(ButtonContainerStyles)}">
+          return `<div style="${stylesToString(buttonContainerStyles)}">
                   <a href="${buttonComp.href}" style="${stylesToString(buttonStyles)}">${buttonComp.text}</a>
                 </div>`;
+
 
         case 'divider':
           return `<hr style="${stylesToString(component.styles)}" />`;
         case 'spacer':
           const spacerComp = component as SpacerComponent;
-          return `<div style="height: ${spacerComp.height}; line-height: ${spacerComp.height};"></div>`;
-        case 'list':
+          const spacerStyles = {
+            height: spacerComp.height || spacerComp.styles?.height || '16px',
+            lineHeight: spacerComp.height || spacerComp.styles?.height || '16px',
+            backgroundColor: spacerComp.styles?.backgroundColor,
+            marginTop: spacerComp.styles?.marginTop,
+            marginRight: spacerComp.styles?.marginRight,
+            marginBottom: spacerComp.styles?.marginBottom,
+            marginLeft: spacerComp.styles?.marginLeft,
+            paddingTop: spacerComp.styles?.paddingTop,
+            paddingRight: spacerComp.styles?.paddingRight,
+            paddingBottom: spacerComp.styles?.paddingBottom,
+            paddingLeft: spacerComp.styles?.paddingLeft,
+            border: spacerComp.styles?.border,
+            borderWidth: spacerComp.styles?.borderWidth,
+            borderStyle: spacerComp.styles?.borderStyle,
+            borderColor: spacerComp.styles?.borderColor,
+            borderRadius: spacerComp.styles?.borderRadius,
+            boxShadow: spacerComp.styles?.boxShadow,
+            opacity: spacerComp.styles?.opacity,
+            width: '100%'
+          };
+
+          return `<div style="${stylesToString(spacerStyles)}"></div>`;
+
           const listComp = component as ListComponent;
 
           // Container styles
@@ -3474,12 +3698,15 @@ export default function EmailEditor({
                 </div>
               )}
 
+
               {lastSaved && !hasUnsavedChanges && (
                 <div className="flex items-center space-x-1 text-xs text-green-600  px-2 py-1 rounded">
                   <div className="w-2 h-2 rounded-full bg-green-400"></div>
                   <span>Saved {formatTimeAgo(lastSaved)}</span>
                 </div>
               )}
+
+
 
               {/* Export HTML - Now Secondary */}
               <Button
@@ -3489,19 +3716,19 @@ export default function EmailEditor({
                 disabled={!onExport}
               >
                 <Download className="h-4 w-4" />
-                Export HTML
               </Button>
 
-              {/* Save Button - Primary Action */}
-              <Button
-                size="sm"
-                onClick={handleManualSave}
-                disabled={!onSave || readOnly}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium min-w-[120px]"
-              >
-                <Save className="h-4 w-4 mr-1" />
-                {hasUnsavedChanges ? 'Save Changes' : (<span className="flex items-center space-x-1 gap-1"><Check className="h-4 w-4" />Saved</span>)}
-              </Button>
+              <div className="flex items-center space-x-2">
+                <Button
+                  onClick={handleManualSave}
+                  variant={saveStatus === 'unsaved' ? 'default' : 'outline'}
+                  className={saveStatus === 'unsaved' ? 'bg-blue-600 text-white' : ''}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saveStatus === 'saving' ? 'Saving...' :
+                    saveStatus === 'unsaved' ? 'Save Changes' : 'Saved'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -3711,6 +3938,7 @@ export default function EmailEditor({
         onClose={() => setIsTemplateLibraryOpen(false)}
         onSelectTemplate={handleSelectTemplate}
         onSelectComponent={handleSelectComponent}
+        teamId={teamId as string} // Add this prop - you'll need to pass teamId to EmailEditor
       />
     </div>
   );
@@ -3967,30 +4195,51 @@ function ComponentRenderer({
 
       case 'button':
         const buttonComp = component as ButtonComponent;
-        const buttonStyles = { ...buttonComp.styles };
-        const buttonAlign = buttonStyles.textAlign || 'left';
-        delete buttonStyles.textAlign;
+
+        // Container styles for layout only
+        const buttonContainerStyles: React.CSSProperties = {
+          textAlign: (buttonComp.styles?.textAlign as 'left' | 'center' | 'right') || 'left',
+          marginTop: buttonComp.styles?.marginTop,
+          marginRight: buttonComp.styles?.marginRight,
+          marginBottom: buttonComp.styles?.marginBottom || '0px',
+          marginLeft: buttonComp.styles?.marginLeft,
+          paddingTop: buttonComp.styles?.paddingTop,
+          paddingRight: buttonComp.styles?.paddingRight,
+          paddingBottom: buttonComp.styles?.paddingBottom,
+          paddingLeft: buttonComp.styles?.paddingLeft
+        };
+
+        // Button styles - INCLUDING BORDERS
+        const buttonStyles: React.CSSProperties = {
+          backgroundColor: buttonComp.styles?.backgroundColor || '#007bff',
+          color: buttonComp.styles?.color || '#ffffff',
+          fontSize: buttonComp.styles?.fontSize || '16px',
+          fontFamily: buttonComp.styles?.fontFamily || 'Arial, sans-serif',
+          fontWeight: buttonComp.styles?.fontWeight || '500',
+          fontStyle: buttonComp.styles?.fontStyle as 'normal' | 'italic' | 'oblique',
+          textDecoration: 'none',
+          display: 'inline-block',
+          padding: buttonComp.styles?.padding || '12px 24px',
+          // APPLY BORDER STYLES TO BUTTON ELEMENT
+          border: buttonComp.styles?.border,
+          borderWidth: buttonComp.styles?.borderWidth,
+          borderStyle: buttonComp.styles?.borderStyle as 'none' | 'solid' | 'dashed' | 'dotted',
+          borderColor: buttonComp.styles?.borderColor,
+          borderRadius: buttonComp.styles?.borderRadius || '4px',
+          boxShadow: buttonComp.styles?.boxShadow,
+          opacity: buttonComp.styles?.opacity,
+          cursor: 'pointer',
+          textTransform: buttonComp.styles?.textTransform as 'none' | 'uppercase' | 'lowercase' | 'capitalize',
+          letterSpacing: buttonComp.styles?.letterSpacing,
+          lineHeight: buttonComp.styles?.lineHeight,
+          transition: 'all 0.3s ease'
+        };
 
         return (
-          <div style={{
-            textAlign: buttonAlign,
-            marginBottom: buttonComp.styles?.marginBottom || '0px',
-            // Apply container-level styles like borders to the div
-            border: buttonComp.styles?.border,
-            borderWidth: buttonComp.styles?.borderWidth,
-            borderStyle: buttonComp.styles?.borderStyle,
-            borderColor: buttonComp.styles?.borderColor,
-            borderRadius: buttonComp.styles?.borderRadius,
-            backgroundColor: buttonComp.styles?.backgroundColor === buttonStyles.backgroundColor ? 'transparent' : buttonComp.styles?.backgroundColor,
-            boxShadow: buttonComp.styles?.boxShadow,
-            padding: buttonComp.styles?.padding !== buttonStyles.padding ? buttonComp.styles?.padding : undefined
-          }}>
+          <div style={buttonContainerStyles}>
             <a
               href={buttonComp.href}
-              style={{
-                ...buttonStyles,
-                textDecoration: 'none'
-              }}
+              style={buttonStyles}
             >
               {buttonComp.text}
             </a>
@@ -3998,12 +4247,37 @@ function ComponentRenderer({
         );
 
 
+
       case 'divider':
         return <hr style={component.styles} />;
 
       case 'spacer':
         const spacerComp = component as SpacerComponent;
-        return <div style={{ height: spacerComp.height, lineHeight: spacerComp.height }}></div>;
+        const spacerStyles: React.CSSProperties = {
+          height: spacerComp.height || spacerComp.styles?.height || '16px',
+          lineHeight: spacerComp.height || spacerComp.styles?.height || '16px',
+          backgroundColor: spacerComp.styles?.backgroundColor,
+          marginTop: spacerComp.styles?.marginTop,
+          marginRight: spacerComp.styles?.marginRight,
+          marginBottom: spacerComp.styles?.marginBottom,
+          marginLeft: spacerComp.styles?.marginLeft,
+          paddingTop: spacerComp.styles?.paddingTop,
+          paddingRight: spacerComp.styles?.paddingRight,
+          paddingBottom: spacerComp.styles?.paddingBottom,
+          paddingLeft: spacerComp.styles?.paddingLeft,
+          border: spacerComp.styles?.border,
+          borderWidth: spacerComp.styles?.borderWidth,
+          borderStyle: spacerComp.styles?.borderStyle as 'none' | 'solid' | 'dashed' | 'dotted',
+          borderColor: spacerComp.styles?.borderColor,
+          borderRadius: spacerComp.styles?.borderRadius,
+          boxShadow: spacerComp.styles?.boxShadow,
+          opacity: spacerComp.styles?.opacity,
+          width: '100%',
+          minHeight: '8px' // Minimum height for visibility
+        };
+
+        return <div style={spacerStyles}></div>;
+
 
       case 'list':
         const listComp = component as ListComponent;

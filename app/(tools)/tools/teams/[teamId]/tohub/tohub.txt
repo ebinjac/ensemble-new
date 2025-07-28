@@ -1,0 +1,1419 @@
+// app/(tools)/tools/teams/[teamId]/tohub/page.tsx
+import { Suspense } from 'react';
+import { requireTeamAccess } from '@/app/(auth)/lib/auth';
+import { getApplicationsByTeam } from '@/app/actions/applications';
+import { TeamAwareLayout } from '@/components/team-aware-layout';
+import { TurnoverForm } from '@/components/tohub/tohub-form';
+
+import { ArrowLeftRight } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { TurnoverSkeleton } from '@/components/tohub/tohub-skeleton';
+
+interface TohubPageProps {
+  params: {
+    teamId: string;
+  };
+  searchParams: {
+    app?: string;
+  };
+}
+
+export async function generateMetadata({ params }: TohubPageProps) {
+  try {
+    const { user } = await requireTeamAccess(params.teamId, { admin: false });
+    const userTeam = user.teams.find(team => team.teamId === params.teamId);
+    
+    return {
+      title: `Turnover Hub - ${userTeam?.teamName || 'Team'} | Ensemble`,
+      description: 'Manage shift turnovers, track incidents, RFCs, and communicate important information across teams.',
+    };
+  } catch {
+    return {
+      title: 'Turnover Hub | Ensemble',
+      description: 'Manage shift turnovers and team communications.',
+    };
+  }
+}
+
+export default async function TohubPage({ params, searchParams }: TohubPageProps) {
+  try {
+    // ✅ Require team access and get user info
+    const { user, role } = await requireTeamAccess(params.teamId, { admin: false });
+    
+    // ✅ Find the current team from user's teams
+    const userTeam = user.teams.find(team => team.teamId === params.teamId);
+    if (!userTeam) {
+      notFound();
+    }
+
+    // ✅ Get applications for this team
+    const applications = await getApplicationsByTeam(params.teamId);
+    const currentAppId = searchParams.app || applications[0]?.id;
+
+    if (!currentAppId && applications.length === 0) {
+      return (
+        <TeamAwareLayout
+          currentTeamId={params.teamId}
+          teamName={userTeam.teamName}
+          userRole={role}
+          toolName="Turnover Hub"
+          toolIcon={<ArrowLeftRight className="h-5 w-5" />}
+        >
+          <div className="container mx-auto py-8 px-4 max-w-screen-2xl">
+            <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
+              <div className="text-center space-y-4 max-w-md">
+                <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+                  <ArrowLeftRight className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">No Applications Found</h3>
+                  <p className="text-sm text-muted-foreground">
+                    This team doesn't have any applications set up yet. Contact your team admin to configure applications for turnover management.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </TeamAwareLayout>
+      );
+    }
+
+    return (
+      <TeamAwareLayout
+        currentTeamId={params.teamId}
+        teamName={userTeam.teamName}
+        userRole={role}
+        toolName="Turnover Hub"
+        toolIcon={<ArrowLeftRight className="h-5 w-5" />}
+      >
+        <div className="container mx-auto py-8 px-4 max-w-screen-2xl">
+          {/* Page Header */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                  Turnover Hub
+                </h1>
+                <p className="text-muted-foreground mt-2">
+                  Manage shift turnovers, track incidents, RFCs, and communicate important information across teams.
+                </p>
+              </div>
+              
+              {/* Team Stats */}
+              <div className="hidden md:flex items-center space-x-6 text-sm text-muted-foreground">
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-foreground">
+                    {applications.filter(app => app.status === 'active').length}
+                  </div>
+                  <div className="text-xs">Active Apps</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-foreground">
+                    {applications.length}
+                  </div>
+                  <div className="text-xs">Total Apps</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-primary">
+                    {role === 'admin' ? 'Admin' : 'Member'}
+                  </div>
+                  <div className="text-xs">Your Role</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Turnover Content */}
+          <Suspense fallback={<TurnoverSkeleton />}>
+            <TurnoverForm
+              teamId={params.teamId}
+              applications={applications}
+              currentAppId={currentAppId}
+              userRole={role === 'admin' ? 'admin' : 'member'}
+            />
+          </Suspense>
+
+          {/* Footer Info */}
+          <div className="mt-12 pt-8 border-t border-border">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+              <div className="text-sm text-muted-foreground">
+                <p>
+                  <strong>Team:</strong> {userTeam.teamName} • 
+                  <strong className="ml-1">Role:</strong> {role} • 
+                  <strong className="ml-1">Applications:</strong> {applications.length}
+                  {currentAppId && (
+                    <>
+                      {' • '}
+                      <strong className="ml-1">Current App:</strong> {applications.find(app => app.id === currentAppId)?.applicationName}
+                    </>
+                  )}
+                </p>
+              </div>
+              
+              <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                <span>Last updated: {new Date().toLocaleDateString()}</span>
+                {role === 'admin' && (
+                  <span className="flex items-center space-x-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    <span>Admin privileges active</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </TeamAwareLayout>
+    );
+  } catch (error) {
+    console.error('Error loading Turnover Hub page:', error);
+    notFound();
+  }
+}
+
+// ✅ Optional: Export for dynamic imports if needed
+export const dynamic = 'force-dynamic';
+export const revalidate = 0; // Always get fresh data
+
+
+
+// app/tools/teams/[teamId]/tohub/actions/turnover-actions.ts
+'use server'
+
+import { db } from '@/db'                             // drizzle db instance
+import {
+  subApplications,
+  turnoverSessions,
+  turnoverEntries,
+  turnoverSnapshots,
+  entryAttachments,
+  sectionType,
+  entryStatus,
+  flagType,
+} from '@/db/schema/tohub'
+import { eq, and, inArray, sql, asc } from 'drizzle-orm'
+import { applications } from '@/db/schema/teams'; 
+import {
+  requireAuth,
+  requireTeamAccess,
+} from '@/app/(auth)/lib/auth'
+
+/* ------------------------------------------------------------------ */
+/*  SUB-APPLICATIONS                                                  */
+/* ------------------------------------------------------------------ */
+
+export async function getApplicationsWithSubApps(teamId: string) {
+  // 1) get the team’s applications
+  const apps = await db
+    .select({
+      id: applications.id,
+      applicationName: applications.applicationName,
+    })
+    .from(applications)
+    .where(eq(applications.teamId, teamId))
+    .orderBy(asc(applications.applicationName));
+
+  // 2) for each application fetch its sub-apps in one round-trip
+  const appIds = apps.map(a => a.id);
+  const subApps = await db
+    .select({
+      id: subApplications.id,
+      applicationId: subApplications.applicationId,
+      name: subApplications.name,
+    })
+    .from(subApplications)
+    .where(
+      and(
+        inArray(subApplications.applicationId, appIds),
+        eq(subApplications.isActive, true),
+      ),
+    )
+    .orderBy(asc(subApplications.displayOrder), asc(subApplications.name));
+
+  // 3) stitch them together
+  const byApp: Record<string, typeof subApps> = {};
+  for (const sa of subApps) {
+    (byApp[sa.applicationId] ??= []).push(sa);
+  }
+
+  return apps.map(app => ({
+    ...app,
+    subApplications: byApp[app.id] ?? [],
+  }));
+}
+
+export async function listSubApps(applicationId: string) {
+  // anyone with team access may view
+  return db
+    .select()
+    .from(subApplications)
+    .where(and(eq(subApplications.applicationId, applicationId), eq(subApplications.isActive, true)))
+    .orderBy(subApplications.displayOrder, subApplications.name)
+}
+
+export async function createSubApp(
+  teamId: string,
+  applicationId: string,
+  data: { name: string; description?: string },
+) {
+  const { user, role } = await requireTeamAccess(teamId, {admin: true})
+  if (role !== 'admin') throw new Error('Admin rights required')
+
+  const [row] = await db
+    .insert(subApplications)
+    .values({
+      applicationId,
+      name: data.name.trim(),
+      description: data.description,
+      createdBy: user.user.email,
+    })
+    .returning()
+  return row
+}
+
+export async function deactivateSubApp(teamId: string, subAppId: string) {
+  const { user, role } = await requireTeamAccess(teamId, {admin: true})
+  if (role !== 'admin') throw new Error('Admin rights required')
+
+  await db
+    .update(subApplications)
+    .set({
+      isActive: false,
+      updatedBy: user.user.email,
+      updatedAt: new Date(),
+    })
+    .where(eq(subApplications.id, subAppId))
+}
+
+/* ------------------------------------------------------------------ */
+/*  TURNOVER SESSIONS                                                 */
+/* ------------------------------------------------------------------ */
+
+export async function getOrCreateCurrentSession(
+  teamId: string,
+  applicationId: string,
+  data: { handoverFrom: string; handoverTo: string },
+) {
+  const { user } = await requireTeamAccess(teamId, {admin: false})
+
+  // If a “current” session already exists, return it
+  const [existing] = await db
+    .select()
+    .from(turnoverSessions)
+    .where(
+      and(
+        eq(turnoverSessions.teamId, teamId),
+        eq(turnoverSessions.applicationId, applicationId),
+        eq(turnoverSessions.isCurrent, true),
+      ),
+    )
+    .limit(1)
+
+  if (existing) return existing
+
+  // Otherwise create a new one for today
+  const [row] = await db
+    .insert(turnoverSessions)
+    .values({
+      teamId,
+      applicationId,
+      handoverFrom: data.handoverFrom,
+      handoverTo: data.handoverTo,
+      sessionDate: new Date(), // today
+      createdBy: user.user.email,
+      updatedBy: user.user.email,
+    })
+    .returning()
+  return row
+}
+
+export async function updateSessionHandover(
+  sessionId: string,
+  data: { handoverFrom?: string; handoverTo?: string },
+) {
+  const { user } = await requireAuth()
+
+  await db
+    .update(turnoverSessions)
+    .set({
+      ...(data.handoverFrom && { handoverFrom: data.handoverFrom }),
+      ...(data.handoverTo && { handoverTo: data.handoverTo }),
+      updatedBy: user.email,
+      updatedAt: new Date(),
+    })
+    .where(eq(turnoverSessions.id, sessionId))
+}
+
+/* ------------------------------------------------------------------ */
+/*  SUB-APP SELECTION FOR A SESSION                                   */
+/* ------------------------------------------------------------------ */
+
+export async function updateSelectedSubApps(
+  sessionId: string,
+  selected: string[],
+) {
+  const { user } = await requireAuth()
+
+  await db
+    .update(turnoverSessions)
+    .set({
+      selectedSubApps: selected,
+      updatedBy: user.email,
+      updatedAt: new Date(),
+    })
+    .where(eq(turnoverSessions.id, sessionId))
+}
+
+/* ------------------------------------------------------------------ */
+/*  TURNOVER ENTRIES (RFC / INC / ALERTS / MIM / EMAIL_SLACK / FYI)   */
+/* ------------------------------------------------------------------ */
+
+export async function addEntry(
+  sessionId: string,
+  input: {
+    subApplicationId?: string | null
+    section: typeof sectionType.$type
+    title?: string
+    description?: string
+    comments?: string
+    status?: typeof entryStatus.$type
+    sectionData?: unknown
+    isImportant?: boolean
+  },
+) {
+  const { user } = await requireAuth()
+  const [row] = await db
+    .insert(turnoverEntries)
+    .values({
+      sessionId,
+      subApplicationId: input.subApplicationId || null,
+      sectionType: input.section,
+      title: input.title,
+      description: input.description,
+      comments: input.comments,
+      status: input.status ?? 'open',
+      sectionData: input.sectionData ?? {},
+      isImportant: input.isImportant ?? false,
+      createdBy: user.email,
+      updatedBy: user.email,
+    })
+    .returning()
+  return row
+}
+
+export async function updateEntry(
+  entryId: string,
+  patch: Partial<{
+    title: string;
+    description: string;
+    comments: string;
+    status: typeof entryStatus.$type;
+    sectionData: unknown;
+    isImportant: boolean;
+  }>
+) {
+  const { user } = await requireAuth();
+
+  const [updatedEntry] = await db
+    .update(turnoverEntries)
+    .set({
+      ...patch,
+      updatedBy: user.email,
+      updatedAt: new Date(),
+    })
+    .where(eq(turnoverEntries.id, entryId))
+    .returning();
+
+  return updatedEntry;
+}
+
+export async function deleteEntry(entryId: string) {
+  const { user } = await requireAuth()
+  // Hard delete is acceptable here; if you prefer soft-delete add an `isActive` column
+  await db
+    .delete(turnoverEntries)
+    .where(eq(turnoverEntries.id, entryId))
+    .execute()
+}
+
+/* ------------------------------------------------------------------ */
+/*  FLAGGING / UNFLAGGING                                             */
+/* ------------------------------------------------------------------ */
+
+export async function flagEntry(
+  entryId: string,
+  data: { flag: typeof flagType.$type; reason?: string },
+) {
+  const { user } = await requireAuth()
+
+  await db
+    .update(turnoverEntries)
+    .set({
+      isFlagged: true,
+      flagType: data.flag,
+      flagReason: data.reason,
+      flaggedAt: new Date(),
+      flaggedBy: user.email,
+      updatedBy: user.email,
+      updatedAt: new Date(),
+    })
+    .where(eq(turnoverEntries.id, entryId))
+}
+
+export async function clearFlag(entryId: string) {
+  const { user } = await requireAuth()
+
+  await db
+    .update(turnoverEntries)
+    .set({
+      isFlagged: false,
+      flagType: null,
+      flagReason: null,
+      flaggedAt: null,
+      flaggedBy: null,
+      updatedBy: user.email,
+      updatedAt: new Date(),
+    })
+    .where(eq(turnoverEntries.id, entryId))
+}
+
+/* ------------------------------------------------------------------ */
+/*  ATTACHMENTS (MIM / SLACK / LINKS)                                 */
+/* ------------------------------------------------------------------ */
+
+export async function addAttachment(
+  entryId: string,
+  attachment: {
+    type: string // 'link' | 'mim' | 'slack' | 'email'
+    title?: string
+    url: string
+    description?: string
+  },
+) {
+  const { user } = await requireAuth()
+  const [row] = await db
+    .insert(entryAttachments)
+    .values({
+      entryId,
+      attachmentType: attachment.type,
+      title: attachment.title,
+      url: attachment.url,
+      description: attachment.description,
+      createdBy: user.email,
+    })
+    .returning()
+  return row
+}
+
+export async function deleteAttachment(attachmentId: string) {
+  await db.delete(entryAttachments).where(eq(entryAttachments.id, attachmentId))
+}
+
+/* ------------------------------------------------------------------ */
+/*  DAILY SNAPSHOT (called by cron or Edge Scheduler)                 */
+/* ------------------------------------------------------------------ */
+
+export async function createDailySnapshot(sessionId: string) {
+  const { user } = await requireAuth()
+
+  // fetch session + entries
+  const [session] = await db
+    .select()
+    .from(turnoverSessions)
+    .where(eq(turnoverSessions.id, sessionId))
+  if (!session) throw new Error('Session not found')
+
+  const entries = await db
+    .select()
+    .from(turnoverEntries)
+    .where(eq(turnoverEntries.sessionId, sessionId))
+
+  await db.insert(turnoverSnapshots).values({
+    sessionId,
+    snapshotDate: new Date(),
+    sessionData: session,
+    entriesData: entries,
+    totalEntries: entries.length,
+    flaggedEntries: entries.filter(e => e.isFlagged).length,
+    completedEntries: entries.filter(e => e.status === 'resolved' || e.status === 'closed').length,
+    createdBy: user.email,
+  })
+}
+
+/* ------------------------------------------------------------------ */
+/*  HOUSEKEEPING: AUTO-FLAG STALE ITEMS (run via background job)      */
+/* ------------------------------------------------------------------ */
+
+export async function autoFlagStaleEntries() {
+  const cutoff24 = sql`NOW() - INTERVAL '24 hours'`
+  const cutoff72 = sql`NOW() - INTERVAL '72 hours'`
+
+  // 1. Needs-update flags (>24 h since last update)
+  await db
+    .update(turnoverEntries)
+    .set({
+      isFlagged: true,
+      flagType: 'needs_update',
+    })
+    .where(
+      and(
+        eq(turnoverEntries.isFlagged, false),
+        sql`${turnoverEntries.updatedAt} < ${cutoff24}`,
+      ),
+    )
+
+  // 2. Long-pending flags (>72 h open/pending)
+  await db
+    .update(turnoverEntries)
+    .set({
+      isFlagged: true,
+      flagType: 'long_pending',
+    })
+    .where(
+      and(
+        inArray(turnoverEntries.status, ['open', 'pending']),
+        sql`${turnoverEntries.createdAt} < ${cutoff72}`,
+      ),
+    )
+}
+
+export async function fetchSectionEntries(sessionId: string, section: typeof sectionType.$type) {
+  const { user } = await requireAuth()
+  
+  return db
+    .select()
+    .from(turnoverEntries)
+    .where(
+      and(
+        eq(turnoverEntries.sessionId, sessionId),
+        eq(turnoverEntries.sectionType, section)
+      )
+    )
+    .orderBy(turnoverEntries.createdAt)
+}
+
+export async function updateSubApplication(
+  teamId: string,
+  subAppId: string,
+  data: { name: string; description?: string; displayOrder?: number }
+) {
+  const { user, role } = await requireTeamAccess(teamId, {admin: true});
+  if (role !== 'admin') throw new Error('Admin rights required');
+
+  const [updatedSubApp] = await db
+    .update(subApplications)
+    .set({
+      name: data.name.trim(),
+      description: data.description,
+      displayOrder: data.displayOrder || 0,
+      updatedBy: user.user.email,
+      updatedAt: new Date(),
+    })
+    .where(eq(subApplications.id, subAppId))
+    .returning();
+
+  return updatedSubApp;
+}
+
+export async function deleteSubApplication(teamId: string, subAppId: string) {
+  const { user, role } = await requireTeamAccess(teamId, {admin: true});
+  if (role !== 'admin') throw new Error('Admin rights required');
+
+  // Check if sub-application is in use
+  const entriesUsingSubApp = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(turnoverEntries)
+    .where(eq(turnoverEntries.subApplicationId, subAppId));
+
+  if (entriesUsingSubApp[0]?.count > 0) {
+    // Soft delete - just deactivate
+    await db
+      .update(subApplications)
+      .set({
+        isActive: false,
+        updatedBy: user.user.email,
+        updatedAt: new Date(),
+      })
+      .where(eq(subApplications.id, subAppId));
+    
+    return { deleted: false, deactivated: true };
+  } else {
+    // Hard delete if no entries use it
+    await db
+      .delete(subApplications)
+      .where(eq(subApplications.id, subAppId));
+    
+    return { deleted: true, deactivated: false };
+  }
+}
+
+export async function reorderSubApplications(
+  teamId: string,
+  applicationId: string,
+  subAppIds: string[]
+) {
+  const { user, role } = await requireTeamAccess(teamId, {admin: true});
+  if (role !== 'admin') throw new Error('Admin rights required');
+
+  // Update display order for each sub-application
+  const updates = subAppIds.map((subAppId, index) =>
+    db
+      .update(subApplications)
+      .set({
+        displayOrder: index,
+        updatedBy: user.user.email,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(subApplications.id, subAppId),
+          eq(subApplications.applicationId, applicationId)
+        )
+      )
+  );
+
+  await Promise.all(updates);
+}
+
+export async function getApplicationsWithSubAppsForAdmin(teamId: string) {
+  const { user, role } = await requireTeamAccess(teamId, {admin: true});
+  if (role !== 'admin') throw new Error('Admin rights required');
+
+  // Get applications with all sub-apps (including inactive)
+  const apps = await db
+    .select({
+      id: applications.id,
+      applicationName: applications.applicationName,
+      description: applications.description,
+    })
+    .from(applications)
+    .where(eq(applications.teamId, teamId))
+    .orderBy(asc(applications.applicationName));
+
+  // Get all sub-applications (including inactive for admin view)
+  const allSubApps = await db
+    .select()
+    .from(subApplications)
+    .where(inArray(subApplications.applicationId, apps.map(a => a.id)))
+    .orderBy(asc(subApplications.displayOrder), asc(subApplications.name));
+
+  // Group sub-apps by application
+  const subAppsByApp: Record<string, typeof allSubApps> = {};
+  for (const subApp of allSubApps) {
+    (subAppsByApp[subApp.applicationId] ??= []).push(subApp);
+  }
+
+  return apps.map(app => ({
+    ...app,
+    subApplications: subAppsByApp[app.id] ?? [],
+  }));
+}
+
+export async function fetchTurnoverSession(teamId: string, applicationId: string) {
+  const { user } = await requireAuth();
+  
+  // Get or create current session
+  let [session] = await db
+    .select()
+    .from(turnoverSessions)
+    .where(
+      and(
+        eq(turnoverSessions.teamId, teamId),
+        eq(turnoverSessions.applicationId, applicationId),
+        eq(turnoverSessions.isCurrent, true)
+      )
+    )
+    .limit(1);
+
+  if (!session) {
+    // Create new session if none exists
+    [session] = await db
+      .insert(turnoverSessions)
+      .values({
+        teamId,
+        applicationId,
+        handoverFrom: user.email || 'Unknown',
+        handoverTo: 'TBD',
+        sessionDate: new Date().toISOString().split('T')[0],
+        isCurrent: true,
+        createdBy: user.email || 'system',
+        updatedBy: user.email || 'system',
+      })
+      .returning();
+  }
+
+  return session;
+}
+
+export async function fetchSubApplications(teamId: string, applicationId: string) {
+  const { user } = await requireAuth();
+  
+  const subApps = await db
+    .select()
+    .from(subApplications)
+    .where(
+      and(
+        eq(subApplications.applicationId, applicationId),
+        eq(subApplications.isActive, true)
+      )
+    )
+    .orderBy(asc(subApplications.displayOrder), asc(subApplications.name));
+
+  return subApps;
+}
+
+export async function fetchApplicationsForTeam(teamId: string) {
+  const { user } = await requireAuth();
+  
+  const apps = await db
+    .select()
+    .from(applications)
+    .where(eq(applications.teamId, teamId))
+    .orderBy(asc(applications.applicationName));
+
+  return apps;
+}
+
+export async function fetchCurrentSession(teamId: string, applicationId: string) {
+  const { user } = await requireAuth();
+  
+  // Get or create current session
+  let [session] = await db
+    .select()
+    .from(turnoverSessions)
+    .where(
+      and(
+        eq(turnoverSessions.teamId, teamId),
+        eq(turnoverSessions.applicationId, applicationId),
+        eq(turnoverSessions.isCurrent, true)
+      )
+    )
+    .limit(1);
+
+  if (!session) {
+    // Create new session if none exists
+    [session] = await db
+      .insert(turnoverSessions)
+      .values({
+        teamId,
+        applicationId,
+        handoverFrom: user.email || 'Unknown',
+        handoverTo: 'TBD',
+        sessionDate: new Date().toISOString().split('T')[0],
+        isCurrent: true,
+        createdBy: user.email || 'system',
+        updatedBy: user.email || 'system',
+      })
+      .returning();
+  }
+
+  return session;
+}
+
+export async function fetchSubApplicationsByTeam(teamId: string, applicationId: string) {
+  const { user } = await requireAuth();
+  
+  const subApps = await db
+    .select()
+    .from(subApplications)
+    .where(
+      and(
+        eq(subApplications.applicationId, applicationId),
+        eq(subApplications.isActive, true)
+      )
+    )
+    .orderBy(asc(subApplications.displayOrder), asc(subApplications.name));
+
+  return subApps;
+}
+
+
+// app/(tools)/tools/teams/[teamId]/tohub/components/ApplicationTabs.tsx
+'use client';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+
+interface Props {
+  teamId: string;
+  applications: any[];
+  currentAppId: string;
+  onAppSwitch: (applicationId: string) => void;
+}
+
+export function ApplicationTabs({ teamId, applications, currentAppId, onAppSwitch }: Props) {
+  // Always render, even for single application
+  if (applications.length === 0) {
+    return (
+      <Card className="border-border/50">
+        <CardContent className="p-4">
+          <div className="text-center text-muted-foreground">
+            <p className="text-sm">No applications configured for this team.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // For single application, show it but don't make it clickable
+  if (applications.length === 1) {
+    const app = applications[0];
+    return (
+      <Card className="border-border/50">
+        <CardContent className="p-0">
+          <div className="border-b border-border/40">
+            <div className="px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <span className="text-sm font-medium text-primary">
+                      {app.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-foreground">{app.name}</h3>
+                    {app.description && (
+                      <p className="text-sm text-muted-foreground">{app.description}</p>
+                    )}
+                  </div>
+                </div>
+                <Badge variant="default" className="text-xs">
+                  Current Application
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Multiple applications - show tabs
+  return (
+    <Card className="border-border/50">
+      <CardContent className="p-0">
+        <div className="border-b border-border/40">
+          <nav className="flex space-x-8 px-6" aria-label="Applications">
+            {applications.map((app) => (
+              <Button
+                key={app.id}
+                variant="ghost"
+                onClick={() => onAppSwitch(app.id)}
+                className={cn(
+                  "py-4 px-1 border-b-2 font-medium text-sm transition-colors hover:text-foreground",
+                  app.id === currentAppId
+                    ? "border-primary text-primary bg-primary/5"
+                    : "border-transparent text-muted-foreground hover:border-border"
+                )}
+              >
+                <div className="flex items-center space-x-2">
+                  <span>{app.name}</span>
+                  {app.id === currentAppId && (
+                    <Badge variant="secondary" className="text-xs">
+                      Active
+                    </Badge>
+                  )}
+                </div>
+              </Button>
+            ))}
+          </nav>
+        </div>
+        
+        {/* Active Application Summary */}
+        <div className="px-6 py-3 bg-muted/20">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Managing turnover for: <span className="font-medium text-foreground">
+                {applications.find(app => app.id === currentAppId)?.name}
+              </span>
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {applications.length > 1 ? 'Switch applications using the tabs above' : 'Single application mode'}
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+
+// app/(tools)/tools/teams/[teamId]/tohub/components/TurnoverForm.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ApplicationTabs } from '@/components/tohub/tohub-applications-tab';
+import HandoverSection from '@/components/tohub/tohub-handover-section';
+import DynamicEntrySection from '@/components/tohub/tohub-dynamic-entry';
+import { SECTION_CONFIGS } from '@/components/tohub/config/sessionConfig';
+import { 
+  fetchCurrentSession, 
+  fetchSubApplicationsByTeam 
+} from '@/app/actions/tohub/tohub';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+interface Props {
+  teamId: string;
+  applications: any[];
+  currentAppId: string;
+  userRole: 'admin' | 'member'; // ✅ Added userRole prop
+}
+
+function SectionSkeleton() {
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="h-6 w-32 bg-muted animate-pulse rounded" />
+            <div className="h-8 w-20 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="space-y-3">
+            <div className="h-4 w-full bg-muted animate-pulse rounded" />
+            <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-1/2 bg-muted animate-pulse rounded" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function TurnoverForm({ teamId, applications, currentAppId, userRole }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [session, setSession] = useState<any>(null);
+  const [subApps, setSubApps] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Get current application
+  const currentApp = applications.find(app => app.id === currentAppId);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        // Load session and sub-applications
+        const [sessionData, subAppsData] = await Promise.all([
+          fetchCurrentSession(teamId, currentAppId),
+          fetchSubApplicationsByTeam(teamId, currentAppId)
+        ]);
+
+        setSession(sessionData);
+        setSubApps(subAppsData);
+      } catch (error) {
+        console.error('Failed to load turnover data:', error);
+        toast.error('Failed to load turnover data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (currentAppId) {
+      loadData();
+    }
+  }, [teamId, currentAppId]);
+
+  const handleAppSwitch = (applicationId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('app', applicationId);
+    router.push(`/tools/teams/${teamId}/tohub?${params.toString()}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {/* Application Tabs Skeleton */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex space-x-4">
+              {applications.slice(0, 4).map((_, index) => (
+                <div key={index} className="h-10 w-24 bg-muted animate-pulse rounded" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Sections Skeleton */}
+        {[1, 2, 3, 4, 5, 6].map(i => <SectionSkeleton key={i} />)}
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">Setting up turnover session...</h3>
+            <p className="text-sm text-muted-foreground">
+              Please wait while we prepare your turnover workspace.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Application Tabs */}
+      <ApplicationTabs
+        teamId={teamId}
+        applications={applications}
+        currentAppId={currentAppId}
+        onAppSwitch={handleAppSwitch}
+      />
+
+      {/* Current Application Info */}
+      {currentApp && (
+        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h2 className="text-xl font-semibold text-blue-900">
+                  {currentApp.name} - Turnover Session
+                </h2>
+                <p className="text-sm text-blue-700">
+                  Managing turnover for {currentApp.description || currentApp.name}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-blue-600">Session ID</p>
+                <p className="font-mono text-xs text-blue-800">{session.id.slice(0, 8)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Handover Section */}
+      <Suspense fallback={<SectionSkeleton />}>
+        <HandoverSection 
+          session={session}
+        />
+      </Suspense>
+
+      {/* Dynamic Sections */}
+      <Suspense fallback={<SectionSkeleton />}>
+        <DynamicEntrySection
+          sessionId={session.id}
+          config={SECTION_CONFIGS.rfc}
+          subApplications={subApps}
+        />
+      </Suspense>
+
+      <Suspense fallback={<SectionSkeleton />}>
+        <DynamicEntrySection
+          sessionId={session.id}
+          config={SECTION_CONFIGS.inc}
+          subApplications={subApps}
+        />
+      </Suspense>
+
+      <Suspense fallback={<SectionSkeleton />}>
+        <DynamicEntrySection
+          sessionId={session.id}
+          config={SECTION_CONFIGS.alerts}
+          subApplications={subApps}
+        />
+      </Suspense>
+
+      <Suspense fallback={<SectionSkeleton />}>
+        <DynamicEntrySection
+          sessionId={session.id}
+          config={SECTION_CONFIGS.mim}
+          subApplications={subApps}
+        />
+      </Suspense>
+
+      <Suspense fallback={<SectionSkeleton />}>
+        <DynamicEntrySection
+          sessionId={session.id}
+          config={SECTION_CONFIGS.email_slack}
+          subApplications={subApps}
+        />
+      </Suspense>
+
+      <Suspense fallback={<SectionSkeleton />}>
+        <DynamicEntrySection
+          sessionId={session.id}
+          config={SECTION_CONFIGS.fyi}
+          subApplications={subApps}
+        />
+      </Suspense>
+    </div>
+  );
+}
+
+
+// app/actions/applications.ts
+
+'use server';
+
+import { db } from "@/db";
+import { applications } from "@/db/schema/teams";
+import { requireAuth, requireTeamAccess } from "@/app/(auth)/lib/auth";
+import { revalidatePath } from "next/cache";
+import { and, eq } from "drizzle-orm";
+import {
+  applicationSchema,
+  type ApplicationFormData,
+} from "@/app/types/application";
+
+// Function to generate TLA from application name
+function generateTLA(appName: string): string {
+  // Remove special characters and split into words
+  const words = appName.replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/);
+  
+  if (words.length >= 3) {
+    // If we have 3 or more words, take first letter of first three words
+    return (words[0][0] + words[1][0] + words[2][0]).toUpperCase();
+  } else if (words.length === 2) {
+    // If we have 2 words, take first letter of first word and first two letters of second word
+    return (words[0][0] + words[1].slice(0, 2)).toUpperCase();
+  } else {
+    // If we have 1 word, take first three letters
+    return words[0].slice(0, 3).toUpperCase();
+  }
+}
+
+// Function to ensure TLA uniqueness within a team
+async function ensureUniqueTLA(teamId: string, baseTLA: string): Promise<string> {
+  let finalTLA = baseTLA;
+  let counter = 1;
+  
+  while (true) {
+    // Check if TLA exists for this team
+    const existing = await db.select()
+      .from(applications)
+      .where(
+        and(
+          eq(applications.teamId, teamId),
+          eq(applications.tla, finalTLA)
+        )
+      )
+      .execute();
+
+    if (existing.length === 0) {
+      return finalTLA;
+    }
+
+    // If TLA exists, append number and try again
+    finalTLA = `${baseTLA.slice(0, 2)}${counter}`;
+    counter++;
+
+    // Prevent infinite loop
+    if (counter > 99) {
+      throw new Error("Unable to generate unique TLA");
+    }
+  }
+}
+
+export async function createApplication(data: ApplicationFormData) {
+  try {
+    const user = await requireAuth();
+    
+    // Validate team access
+    const hasTeamAccess = user.teams?.some(team => team.teamId === data.teamId);
+    if (!hasTeamAccess) {
+      throw new Error("You don't have access to this team");
+    }
+
+    // Check if application already exists for this team
+    const existingApp = await db.select()
+      .from(applications)
+      .where(
+        and(
+          eq(applications.teamId, data.teamId),
+          eq(applications.carId, data.carId)
+        )
+      )
+      .execute();
+
+    if (existingApp.length > 0) {
+      throw new Error("An application with this CAR ID already exists in this team");
+    }
+
+    // Validate input data
+    const validatedData = applicationSchema.parse(data);
+
+    // Generate and ensure unique TLA
+    const baseTLA = generateTLA(validatedData.applicationName);
+    const uniqueTLA = await ensureUniqueTLA(validatedData.teamId, baseTLA);
+
+    // Create new application with generated TLA
+    await db.insert(applications).values({
+      ...validatedData,
+      tla: uniqueTLA,
+      createdBy: user.user.email,
+      updatedBy: user.user.email,
+    });
+
+    revalidatePath(`/teams/${data.teamId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to create application:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to create application" 
+    };
+  }
+}
+
+export async function searchCarId(carId: string) {
+  try {
+    await requireAuth();
+
+    if (!carId) {
+      throw new Error("CAR ID is required");
+    }
+
+    // Call the central service API
+    const response = await fetch(`http://localhost:8008/api/central`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch CAR ID data: ${response.statusText}`);
+    }
+
+    const carData = await response.json();
+
+    // Transform the API response to match our application's format
+    // Adjust this mapping based on the actual API response structure
+    const transformedData = {
+      applicationName: carData.applicationName || carData.name,
+      tla: carData.tla || '',
+      vpName: carData.vpName || '',
+      vpEmail: carData.vpEmail || '',
+      directorName: carData.directorName || '',
+      directorEmail: carData.directorEmail || '',
+      tier: carData.tier || 1,
+      description: carData.description || '',
+    };
+
+    return { success: true, data: transformedData };
+  } catch (error) {
+    console.error("Failed to search CAR ID:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to search CAR ID" 
+    };
+  }
+}
+
+export async function updateApplication(id: string, data: Partial<Omit<ApplicationFormData, 'carId' | 'teamId'>>) {
+  try {
+    const user = await requireAuth();
+    // Find the application and check team access
+    const app = await db.select().from(applications).where(eq(applications.id, id)).execute();
+    if (!app.length) throw new Error('Application not found');
+    const teamId = app[0].teamId;
+    const hasTeamAccess = user.teams?.some(team => team.teamId === teamId);
+    if (!hasTeamAccess) throw new Error("You don't have access to this team");
+    // Update application (except carId, teamId)
+    await db.update(applications)
+      .set({ ...data, updatedBy: user.user.fullName })
+      .where(eq(applications.id, id));
+    revalidatePath(`/teams/${teamId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update application:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to update application' };
+  }
+}
+
+export async function deleteApplication(id: string) {
+  try {
+    const user = await requireAuth();
+    // Find the application and check team access
+    const app = await db.select().from(applications).where(eq(applications.id, id)).execute();
+    if (!app.length) throw new Error('Application not found');
+    const teamId = app[0].teamId;
+    const hasTeamAccess = user.teams?.some(team => team.teamId === teamId);
+    if (!hasTeamAccess) throw new Error("You don't have access to this team");
+    await db.delete(applications).where(eq(applications.id, id));
+    revalidatePath(`/teams/${teamId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete application:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to delete application' };
+  }
+}
+
+export async function refreshApplication(id: string) {
+  try {
+    const user = await requireAuth();
+    // Find the application and check team access
+    const app = await db.select().from(applications).where(eq(applications.id, id)).execute();
+    if (!app.length) throw new Error('Application not found');
+    const teamId = app[0].teamId;
+    const carId = app[0].carId;
+    const hasTeamAccess = user.teams?.some(team => team.teamId === teamId);
+    if (!hasTeamAccess) throw new Error("You don't have access to this team");
+    // Fetch latest details from central API
+    const result = await searchCarId(carId);
+    if (!result.success || !result.data) throw new Error(result.error || 'Failed to refresh from central API');
+    await db.update(applications)
+      .set({ ...result.data, updatedBy: user.user.email })
+      .where(eq(applications.id, id));
+    revalidatePath(`/teams/${teamId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to refresh application:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to refresh application' };
+  }
+}
+
+export async function getTeamApplications(teamId: string) {
+  try {
+    const { user } = await requireTeamAccess(teamId, { admin: false });
+
+    const apps = await db
+      .select({
+        id: applications.id,
+        applicationName: applications.applicationName,
+        carId: applications.carId,
+        tla: applications.tla,
+        tier: applications.tier,
+        status: applications.status,
+      })
+      .from(applications)
+      .where(eq(applications.teamId, teamId))
+      .orderBy(applications.applicationName);
+
+    return apps;
+
+  } catch (error) {
+    console.error('Get team applications error:', error);
+    throw new Error('Failed to fetch applications');
+  }
+}
+
+export async function getApplicationsByTeam(teamId: string) {
+  const { user } = await requireAuth();
+  
+  try {
+    const apps = await db
+      .select()
+      .from(applications)
+      .where(eq(applications.teamId, teamId))
+      .orderBy(applications.applicationName);
+
+    return apps;
+  } catch (error) {
+    console.error('Error fetching applications by team:', error);
+    throw new Error('Failed to fetch applications');
+  }
+}
