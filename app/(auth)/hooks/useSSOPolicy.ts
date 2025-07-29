@@ -12,7 +12,7 @@ const mockSSOUser: SSOUser = {
     adsId: "ensemble",
     guid: "@fca9376056149663519865855188315",
     employeeId: "8229989",
-    email: "ensemble.test@daexp.com",
+    email: "ensemble.test5@daexp.com",
     groups: ["SSO_ENSEMBLE_E1"]
   }
 };

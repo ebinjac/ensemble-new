@@ -79,18 +79,32 @@ export interface LinkWithApplications {
 
 export async function createLink(
   teamId: string,
-  linkData: CreateLinkData
-): Promise<{ success: boolean; linkId?: string; error?: string }> {
+  linkData: {
+    title: string;
+    url: string;
+    description?: string;
+    applicationIds?: string[];
+    category?: string;
+    tags?: string[];
+    status?: string;
+    isPinned?: boolean;
+    isPublic?: boolean;
+  }
+): Promise<{
+  success: boolean;
+  linkId?: string;
+  error?: string;
+}> {
   try {
     const { user } = await requireTeamAccess(teamId, { admin: false });
+    const userEmail = user.user.email;
 
-    // Validate URL format
-    if (!linkData.url.match(/^https?:\/\/.+/)) {
-      return { success: false, error: 'Invalid URL format. Must start with http:// or https://' };
-    }
+    // ✅ REMOVED: Duplicate URL check - allowing duplicate URLs now
+    // No longer checking if URL already exists
 
-    // Validate application IDs exist and belong to team
-    if (linkData.applicationIds.length > 0) {
+    // Validate application IDs if provided
+    let validApplicationIds: string[] = [];
+    if (linkData.applicationIds && linkData.applicationIds.length > 0) {
       const validApps = await db
         .select({ id: applications.id })
         .from(applications)
@@ -101,30 +115,8 @@ export async function createLink(
             eq(applications.status, 'active')
           )
         );
-
-      if (validApps.length !== linkData.applicationIds.length) {
-        return { success: false, error: 'One or more applications are invalid or inactive' };
-      }
-    }
-
-    // Check for duplicate URLs within team
-    const existingLink = await db
-      .select({ id: links.id, title: links.title })
-      .from(links)
-      .where(
-        and(
-          eq(links.teamId, teamId),
-          eq(links.url, linkData.url),
-          eq(links.status, 'active')
-        )
-      )
-      .limit(1);
-
-    if (existingLink.length > 0) {
-      return { 
-        success: false, 
-        error: `A link with this URL already exists: "${existingLink[0].title}"` 
-      };
+      
+      validApplicationIds = validApps.map(app => app.id);
     }
 
     // Create the link
@@ -135,171 +127,204 @@ export async function createLink(
         title: linkData.title.trim(),
         url: linkData.url.trim(),
         description: linkData.description?.trim() || null,
-        applicationIds: linkData.applicationIds,
-        category: linkData.category || 'other',
+        applicationIds: validApplicationIds,
+        category: (linkData.category as any) || 'other',
         tags: linkData.tags || [],
+        status: (linkData.status as any) || 'active',
         isPinned: linkData.isPinned || false,
-        isPublic: linkData.isPublic || false,
-        status: 'active',
-        createdBy: user.user.email,
-        updatedBy: user.user.email,
+        isPublic: linkData.isPublic !== undefined ? linkData.isPublic : true,
+        createdBy: userEmail,
+        updatedBy: userEmail,
+        createdAt: new Date(),
         updatedAt: new Date(),
       })
       .returning({ id: links.id });
 
     revalidatePath(`/tools/teams/${teamId}/link-manager`);
-    return { success: true, linkId: newLink.id };
 
+    return { 
+      success: true, 
+      linkId: newLink.id 
+    };
   } catch (error) {
     console.error('Error creating link:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to create link' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create link'
     };
   }
 }
-
 export async function updateLink(
   teamId: string,
   linkId: string,
-  updateData: UpdateLinkData
-): Promise<{ success: boolean; error?: string }> {
+  linkData: {
+    title: string;
+    url: string;
+    description?: string;
+    applicationIds?: string[];
+    category?: string;
+    tags?: string[];
+    status?: string;
+    isPinned?: boolean;
+    isPublic?: boolean;
+  }
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
   try {
-    const { user } = await requireTeamAccess(teamId, { admin: false });
+    const { user, role } = await requireTeamAccess(teamId, { admin: false });
+    const userEmail = user.user.email;
 
+    // Check if link exists and get current data
     const existingLink = await db
-      .select({ id: links.id, teamId: links.teamId })
+      .select({
+        id: links.id,
+        createdBy: links.createdBy,
+      })
       .from(links)
-      .where(eq(links.id, linkId))
+      .where(
+        and(
+          eq(links.id, linkId),
+          eq(links.teamId, teamId)
+        )
+      )
       .limit(1);
 
     if (existingLink.length === 0) {
       return { success: false, error: 'Link not found' };
     }
 
-    if (existingLink[0].teamId !== teamId) {
-      return { success: false, error: 'Access denied' };
+    // Permission check: Only admins or the creator can edit
+    if (role !== 'admin' && existingLink[0].createdBy !== userEmail) {
+      return { 
+        success: false, 
+        error: 'You can only edit links you created' 
+      };
     }
 
-    if (updateData.url && !updateData.url.match(/^https?:\/\/.+/)) {
-      return { success: false, error: 'Invalid URL format. Must start with http:// or https://' };
-    }
+    // ✅ REMOVED: Duplicate URL check - allowing duplicate URLs now
+    // No longer checking if another link with the same URL exists
 
-    if (updateData.applicationIds && updateData.applicationIds.length > 0) {
+    // Validate application IDs if provided
+    let validApplicationIds: string[] = [];
+    if (linkData.applicationIds && linkData.applicationIds.length > 0) {
       const validApps = await db
         .select({ id: applications.id })
         .from(applications)
         .where(
           and(
             eq(applications.teamId, teamId),
-            inArray(applications.id, updateData.applicationIds),
+            inArray(applications.id, linkData.applicationIds),
             eq(applications.status, 'active')
           )
         );
-
-      if (validApps.length !== updateData.applicationIds.length) {
-        return { success: false, error: 'One or more applications are invalid or inactive' };
-      }
+      
+      validApplicationIds = validApps.map(app => app.id);
     }
 
-    if (updateData.url) {
-      const duplicateLink = await db
-        .select({ id: links.id, title: links.title })
-        .from(links)
-        .where(
-          and(
-            eq(links.teamId, teamId),
-            eq(links.url, updateData.url),
-            eq(links.status, 'active'),
-            sql`${links.id} != ${linkId}`
-          )
-        )
-        .limit(1);
-
-      if (duplicateLink.length > 0) {
-        return { 
-          success: false, 
-          error: `Another link with this URL already exists: "${duplicateLink[0].title}"` 
-        };
-      }
-    }
-
-    const updateFields: Record<string, any> = {
-      updatedBy: user.user.email,
-      updatedAt: new Date(),
-    };
-
-    if (updateData.title !== undefined) updateFields.title = updateData.title.trim();
-    if (updateData.url !== undefined) updateFields.url = updateData.url.trim();
-    if (updateData.description !== undefined) updateFields.description = updateData.description?.trim() || null;
-    if (updateData.applicationIds !== undefined) updateFields.applicationIds = updateData.applicationIds;
-    if (updateData.category !== undefined) updateFields.category = updateData.category;
-    if (updateData.tags !== undefined) updateFields.tags = updateData.tags;
-    if (updateData.isPinned !== undefined) updateFields.isPinned = updateData.isPinned;
-    if (updateData.isPublic !== undefined) updateFields.isPublic = updateData.isPublic;
-
+    // Update the link
     await db
       .update(links)
-      .set(updateFields)
-      .where(eq(links.id, linkId));
+      .set({
+        title: linkData.title.trim(),
+        url: linkData.url.trim(),
+        description: linkData.description?.trim() || null,
+        applicationIds: validApplicationIds,
+        category: (linkData.category as any) || 'other',
+        tags: linkData.tags || [],
+        status: (linkData.status as any) || 'active',
+        isPinned: linkData.isPinned || false,
+        isPublic: linkData.isPublic !== undefined ? linkData.isPublic : true,
+        updatedBy: userEmail,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(links.id, linkId),
+          eq(links.teamId, teamId)
+        )
+      );
 
     revalidatePath(`/tools/teams/${teamId}/link-manager`);
-    return { success: true };
 
+    return { success: true };
   } catch (error) {
     console.error('Error updating link:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to update link' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update link'
     };
   }
 }
-
 export async function deleteLink(
   teamId: string,
   linkId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
   try {
-    const { user } = await requireTeamAccess(teamId, { admin: false });
-
+    const { user, role } = await requireTeamAccess(teamId, { admin: false });
+    const userEmail = user.user.email;
+    
+    // Verify the link exists and belongs to the team
     const existingLink = await db
-      .select({ id: links.id, teamId: links.teamId })
+      .select({
+        id: links.id,
+        createdBy: links.createdBy,
+        title: links.title
+      })
       .from(links)
-      .where(eq(links.id, linkId))
+      .where(
+        and(
+          eq(links.id, linkId),
+          eq(links.teamId, teamId)
+        )
+      )
       .limit(1);
 
     if (existingLink.length === 0) {
       return { success: false, error: 'Link not found' };
     }
 
-    if (existingLink[0].teamId !== teamId) {
-      return { success: false, error: 'Access denied' };
+    // ✅ Permission check: Only admins or the creator can delete
+    if (role !== 'admin' && existingLink[0].createdBy !== userEmail) {
+      return { 
+        success: false, 
+        error: 'You can only delete links you created' 
+      };
     }
 
+    // Delete the link
     await db
-      .update(links)
-      .set({
-        status: 'archived',
-        updatedBy: user.user.email,
-        updatedAt: new Date(),
-      })
-      .where(eq(links.id, linkId));
+      .delete(links)
+      .where(
+        and(
+          eq(links.id, linkId),
+          eq(links.teamId, teamId)
+        )
+      );
 
     revalidatePath(`/tools/teams/${teamId}/link-manager`);
+
     return { success: true };
 
   } catch (error) {
     console.error('Error deleting link:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to delete link' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete link'
     };
   }
 }
 
 export async function getLinks(
   teamId: string,
-  filters: LinkFilters = {},
+  filters: LinkFilters & {
+    isPrivate?: boolean;      // Filter for private links only
+    isTeamPublic?: boolean;   // Filter for team public links only
+  } = {},
   sortBy: LinkSortOptions = 'created-desc',
   page = 1,
   limit = 20
@@ -309,11 +334,37 @@ export async function getLinks(
   totalPages: number;
 }> {
   try {
-    await requireTeamAccess(teamId, { admin: false });
+    const { user, role } = await requireTeamAccess(teamId, { admin: false });
+    const userEmail = user.user.email;
 
     const whereConditions = [eq(links.teamId, teamId)];
 
-    // Status filter (default to active)
+    // Handle new filter types
+    if (filters.isPrivate) {
+      // Show only user's private links
+      whereConditions.push(
+        and(
+          eq(links.isPublic, false),
+          eq(links.createdBy, userEmail)
+        )!
+      );
+    } else if (filters.isTeamPublic) {
+      // Show only public links (excluding user's private links)
+      whereConditions.push(eq(links.isPublic, true));
+    } else {
+      // Default visibility filtering: Show public links + user's own private links + all links for admins
+      if (role !== 'admin') {
+        whereConditions.push(
+          or(
+            eq(links.isPublic, true),           // Public links
+            eq(links.createdBy, userEmail)     // User's own links (including private)
+          )!
+        );
+      }
+      // Admins can see all links, so no additional visibility filter needed
+    }
+
+    // Status filter (default to active unless specifically looking for archived/broken)
     if (filters.status) {
       whereConditions.push(eq(links.status, filters.status));
     } else {
@@ -327,11 +378,6 @@ export async function getLinks(
       );
     }
 
-    // Common filter
-    if (filters.isCommon !== undefined) {
-      whereConditions.push(eq(links.isCommon, filters.isCommon));
-    }
-
     // Category filter
     if (filters.category) {
       whereConditions.push(eq(links.category, filters.category as typeof links.category['_']['data']));
@@ -342,7 +388,7 @@ export async function getLinks(
       whereConditions.push(eq(links.isPinned, filters.isPinned));
     }
 
-    // ✅ FIXED: Tags filter with proper text array handling
+    // Tags filter with proper text array handling
     if (filters.tags && filters.tags.length > 0) {
       whereConditions.push(
         sql`${links.tags} && ${sql.raw(`ARRAY[${filters.tags.map(tag => `'${tag.replace(/'/g, "''")}'`).join(',')}]::text[]`)}`
@@ -368,6 +414,10 @@ export async function getLinks(
     if (filters.createdBy && filters.createdBy.trim()) {
       whereConditions.push(ilike(links.createdBy, `%${filters.createdBy.trim()}%`));
     }
+
+    // Date range filters
+    // 
+    
 
     // Build sort order
     let orderBy;
@@ -473,7 +523,6 @@ export async function getLinks(
     throw new Error('Failed to fetch links');
   }
 }
-
 export async function getExistingTags(teamId: string): Promise<string[]> {
   try {
     await requireTeamAccess(teamId, { admin: false });
@@ -878,5 +927,290 @@ export async function getTeamApplications(
   } catch (error) {
     console.error('Error fetching team applications:', error);
     throw new Error('Failed to fetch team applications');
+  }
+}
+
+
+export async function bulkDeleteLinks(
+  teamId: string,
+  linkIds: string[]
+): Promise<{
+  success: boolean;
+  deletedCount?: number;
+  error?: string;
+}> {
+  try {
+    const { user, role } = await requireTeamAccess(teamId, { admin: false });
+    const userEmail = user.user.email;
+    
+    if (!linkIds || linkIds.length === 0) {
+      return { success: false, error: 'No links provided for deletion' };
+    }
+
+    // Verify all links belong to the team and get current data
+    const linksToDelete = await db
+      .select({
+        id: links.id,
+        title: links.title,
+        createdBy: links.createdBy
+      })
+      .from(links)
+      .where(
+        and(
+          eq(links.teamId, teamId),
+          inArray(links.id, linkIds)
+        )
+      );
+
+    if (linksToDelete.length === 0) {
+      return { success: false, error: 'No valid links found for deletion' };
+    }
+
+    // ✅ Permission check: Only admins can delete any links, users can only delete their own
+    if (role !== 'admin') {
+      const unauthorizedLinks = linksToDelete.filter(link => link.createdBy !== userEmail);
+      if (unauthorizedLinks.length > 0) {
+        return { 
+          success: false, 
+          error: `You can only delete links you created. ${unauthorizedLinks.length} link(s) belong to other users.` 
+        };
+      }
+    }
+
+    // Perform the deletion
+    await db
+      .delete(links)
+      .where(
+        and(
+          eq(links.teamId, teamId),
+          inArray(links.id, linkIds)
+        )
+      );
+
+    revalidatePath(`/tools/teams/${teamId}/link-manager`);
+
+    return {
+      success: true,
+      deletedCount: linksToDelete.length
+    };
+
+  } catch (error) {
+    console.error('Error in bulk delete:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete links'
+    };
+  }
+}
+
+export async function toggleLinkPin(
+  teamId: string,
+  linkId: string,
+  isPinned: boolean
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const { user, role } = await requireTeamAccess(teamId, { admin: false });
+    const userEmail = user.user.email;
+    
+    // Verify the link exists and belongs to the team
+    const existingLink = await db
+      .select({
+        id: links.id,
+        createdBy: links.createdBy,
+        isPinned: links.isPinned
+      })
+      .from(links)
+      .where(
+        and(
+          eq(links.id, linkId),
+          eq(links.teamId, teamId)
+        )
+      )
+      .limit(1);
+
+    if (existingLink.length === 0) {
+      return { success: false, error: 'Link not found' };
+    }
+
+    // ✅ Permission check: Only admins or the creator can pin/unpin
+    if (role !== 'admin' && existingLink[0].createdBy !== userEmail) {
+      return { 
+        success: false, 
+        error: 'You can only pin/unpin links you created' 
+      };
+    }
+
+    // Update the pin status
+    await db
+      .update(links)
+      .set({
+        isPinned,
+        updatedBy: userEmail,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(links.id, linkId),
+          eq(links.teamId, teamId)
+        )
+      );
+
+    revalidatePath(`/tools/teams/${teamId}/link-manager`);
+
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error toggling link pin:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update pin status'
+    };
+  }
+}
+
+
+export async function getLinkCounts(
+  teamId: string
+): Promise<{
+  all: number;
+  pinned: number;
+  private: number;
+  team: number;
+  archived: number;
+  broken: number;
+  [key: string]: number; // For application-specific counts like 'app-{id}'
+}> {
+  try {
+    const { user, role } = await requireTeamAccess(teamId, { admin: false });
+    const userEmail = user.user.email;
+
+    // Base visibility condition for non-admin users
+    const getVisibilityCondition = () => {
+      if (role === 'admin') {
+        return undefined; // Admins can see all links
+      }
+      return or(
+        eq(links.isPublic, true),           // Public links
+        eq(links.createdBy, userEmail)     // User's own links
+      )!;
+    };
+
+    const baseConditions = [eq(links.teamId, teamId)];
+    const visibilityCondition = getVisibilityCondition();
+    if (visibilityCondition) {
+      baseConditions.push(visibilityCondition);
+    }
+
+    // ✅ Count all active links (visible to user)
+    const [allCount] = await db
+      .select({ count: count() })
+      .from(links)
+      .where(and(
+        ...baseConditions,
+        eq(links.status, 'active')
+      ));
+
+    // ✅ Count pinned links
+    const [pinnedCount] = await db
+      .select({ count: count() })
+      .from(links)
+      .where(and(
+        ...baseConditions,
+        eq(links.status, 'active'),
+        eq(links.isPinned, true)
+      ));
+
+    // ✅ Count private links (user's own private links)
+    const [privateCount] = await db
+      .select({ count: count() })
+      .from(links)
+      .where(and(
+        eq(links.teamId, teamId),
+        eq(links.status, 'active'),
+        eq(links.isPublic, false),
+        eq(links.createdBy, userEmail)
+      ));
+
+    // ✅ Count team links (public links only)
+    const [teamCount] = await db
+      .select({ count: count() })
+      .from(links)
+      .where(and(
+        eq(links.teamId, teamId),
+        eq(links.status, 'active'),
+        eq(links.isPublic, true)
+      ));
+
+    // ✅ Count archived links
+    const [archivedCount] = await db
+      .select({ count: count() })
+      .from(links)
+      .where(and(
+        ...baseConditions,
+        eq(links.status, 'archived')
+      ));
+
+    // ✅ Count broken links
+    const [brokenCount] = await db
+      .select({ count: count() })
+      .from(links)
+      .where(and(
+        ...baseConditions,
+        eq(links.status, 'broken')
+      ));
+
+    // ✅ Get application-specific counts
+    const applicationCounts: Record<string, number> = {};
+    
+    // Get all applications for this team
+    const teamApplications = await db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(
+        and(
+          eq(applications.teamId, teamId),
+          eq(applications.status, 'active')
+        )
+      );
+
+    // Count links for each application
+    for (const app of teamApplications) {
+      const conditions = [...baseConditions, eq(links.status, 'active')];
+      conditions.push(
+        sql`${links.applicationIds} && ${sql.raw(`'{${app.id}}'::uuid[]`)}`
+      );
+
+      const [appCount] = await db
+        .select({ count: count() })
+        .from(links)
+        .where(and(...conditions));
+
+      applicationCounts[`app-${app.id}`] = appCount.count;
+    }
+
+    return {
+      all: allCount.count,
+      pinned: pinnedCount.count,
+      private: privateCount.count,
+      team: teamCount.count,
+      archived: archivedCount.count,
+      broken: brokenCount.count,
+      ...applicationCounts
+    };
+
+  } catch (error) {
+    console.error('Error getting link counts:', error);
+    // Return zero counts on error
+    return {
+      all: 0,
+      pinned: 0,
+      private: 0,
+      team: 0,
+      archived: 0,
+      broken: 0
+    };
   }
 }

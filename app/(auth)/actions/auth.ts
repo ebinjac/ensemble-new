@@ -2,9 +2,6 @@
 
 import { cookies } from 'next/headers';
 
-import { db } from '@/db';
-import { teams } from '@/db/schema/teams';
-import { eq, or } from 'drizzle-orm';
 import type { SSOUser, AuthResponse, TeamAccess } from '@/app/types/auth';
 import { getUserTeamAccess } from '../lib/team-utils';
 import { StatelessSessionManager } from '../lib/token';

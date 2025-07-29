@@ -167,7 +167,7 @@ export function LinkAnalytics({ teamId }: LinkAnalyticsProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Link Analytics</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Link Performance</h2>
           <p className="text-muted-foreground">
             Usage insights and statistics for your team's links
           </p>
@@ -199,7 +199,7 @@ export function LinkAnalytics({ teamId }: LinkAnalyticsProps) {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Links</CardTitle>
@@ -238,7 +238,7 @@ export function LinkAnalytics({ teamId }: LinkAnalyticsProps) {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </div> */}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Popular Links */}

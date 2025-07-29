@@ -1,4 +1,4 @@
-// app/components/link-manager/LinkDialog.tsx (Add status field)
+// app/components/link-manager/LinkDialog.tsx
 'use client'
 
 import { useState, useEffect } from 'react';
@@ -22,8 +22,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch'; // ✅ Import Switch component
 import { Badge } from '@/components/ui/badge';
-import { X, Plus, Info } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { X, Plus, Info, User, Clock, Users, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Tooltip,
@@ -64,9 +66,9 @@ export function LinkDialog({
     applicationIds: [] as string[],
     category: 'other' as const,
     tags: [] as string[],
-    status: 'active' as const, // ✅ Added status field
+    status: 'active' as const,
     isPinned: false,
-    isPublic: false,
+    isPublic: true, // Default to public for new links
   });
   const [tagInput, setTagInput] = useState('');
 
@@ -80,9 +82,9 @@ export function LinkDialog({
         applicationIds: link.applicationIds || [],
         category: (link.category as any) || 'other',
         tags: link.tags || [],
-        status: (link.status as any) || 'active', // ✅ Set status from link
+        status: (link.status as any) || 'active',
         isPinned: link.isPinned || false,
-        isPublic: link.isPublic || false,
+        isPublic: link.isPublic || true,
       });
     } else {
       setFormData({
@@ -92,9 +94,9 @@ export function LinkDialog({
         applicationIds: [],
         category: 'other',
         tags: [],
-        status: 'active', // ✅ Default to active
+        status: 'active',
         isPinned: false,
-        isPublic: false,
+        isPublic: true, // Default to public for new links
       });
     }
     setTagInput('');
@@ -172,6 +174,50 @@ export function LinkDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Creator/Updater Information for existing links */}
+        {link && (
+          <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              Link Information
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <User className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Created by:</span>
+                <Badge variant="outline" className="text-xs">
+                  {link.createdBy}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Created:</span>
+                <span className="text-xs">
+                  {new Date(link.createdAt).toLocaleString()}
+                </span>
+              </div>
+              {link.updatedBy && link.updatedBy !== link.createdBy && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <User className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Last updated by:</span>
+                    <Badge variant="outline" className="text-xs">
+                      {link.updatedBy}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Updated:</span>
+                    <span className="text-xs">
+                      {link.updatedAt ? new Date(link.updatedAt).toLocaleString() : 'N/A'}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Title */}
           <div className="space-y-2">
@@ -233,7 +279,7 @@ export function LinkDialog({
               </Select>
             </div>
 
-            {/* ✅ Status Field */}
+            {/* Status Field */}
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
                 <Label>Status</Label>
@@ -273,7 +319,7 @@ export function LinkDialog({
           {/* Applications */}
           <div className="space-y-2">
             <Label>Applications</Label>
-            <div className="border rounded-lg p-3 max-h-40 overflow-y-auto">
+            <div className="border rounded-lg p-3 max-h-40 overflow-y-auto bg-background">
               <div className="grid grid-cols-2 gap-2">
                 {applications
                   .filter(app => app.status === 'active')
@@ -331,9 +377,55 @@ export function LinkDialog({
             )}
           </div>
 
-          {/* Options */}
-          <div className="space-y-3">
-            <Label>Options</Label>
+          <Separator />
+
+          {/* ✅ Enhanced Visibility Options with Switch Component */}
+          <div className="space-y-4">
+            <Label>Visibility & Options</Label>
+            
+            {/* ✅ Public/Private Switch Toggle */}
+            <div className="space-y-3 bg-muted/30 p-4 rounded-lg border">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center gap-2">
+                    {formData.isPublic ? (
+                      <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <Lock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    )}
+                    <Label htmlFor="visibility-switch" className="cursor-pointer font-medium">
+                      {formData.isPublic ? 'Public Link' : 'Private Link'}
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.isPublic 
+                      ? "This link is visible to all team members" 
+                      : "This link is only visible to you and team administrators"
+                    }
+                  </p>
+                </div>
+                
+                {/* ✅ Switch Component replaces Checkbox */}
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm text-muted-foreground">Private</span>
+                  <Switch
+                    id="visibility-switch"
+                    checked={formData.isPublic}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isPublic: checked }))}
+                    className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-orange-500 dark:data-[state=checked]:bg-green-600 dark:data-[state=unchecked]:bg-orange-600"
+                  />
+                  <span className="text-sm text-muted-foreground">Public</span>
+                </div>
+              </div>
+              
+              {!formData.isPublic && (
+                <div className="text-xs text-orange-700 bg-orange-100 dark:text-orange-300 dark:bg-orange-950/30 p-2 rounded border border-orange-200 dark:border-orange-800">
+                  <strong>Note:</strong> Private links are only visible to you and team administrators.
+                </div>
+              )}
+            </div>
+
+            {/* Other Options - Pin Toggle */}
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -343,17 +435,6 @@ export function LinkDialog({
                 />
                 <Label htmlFor="isPinned" className="cursor-pointer">
                   Pin this link (appears at top of lists)
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="isPublic"
-                  checked={formData.isPublic}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isPublic: checked as boolean }))}
-                />
-                <Label htmlFor="isPublic" className="cursor-pointer">
-                  Make public (visible to all team members)
                 </Label>
               </div>
             </div>

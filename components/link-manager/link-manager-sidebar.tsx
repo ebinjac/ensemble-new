@@ -1,173 +1,296 @@
-// app/components/link-manager/ApplicationSidebar.tsx (Updated)
+// app/components/link-manager/ApplicationSidebar.tsx
 'use client'
 
-import { useAuth } from '@/app/(auth)/providers/AuthProvider';
-import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import {
-    List,
-    Hash,
-    Pin,
-    BarChart3,
-    Building2,
-    Shield
+import { 
+  Link2, Pin, Users, Lock, Building2, BarChart3, 
+  Archive, AlertCircle
 } from 'lucide-react';
 
 interface ApplicationSidebarProps {
-    applications: Array<{
-        id: string;
-        applicationName: string;
-        tla: string;
-        status: string;
-    }>;
-    activeTab: string;
-    onTabChange: (tab: string) => void;
-    linkCounts: Record<string, number>;
-    currentTeamId: string; // ✅ Use team ID to get team info from auth
+  applications: Array<{
+    id: string;
+    applicationName: string;
+    tla: string;
+    status: string;
+  }>;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  linkCounts: Record<string, number>;
+  currentTeamId: string;
 }
 
-export function ApplicationSidebar({
-    applications,
-    activeTab,
-    onTabChange,
-    linkCounts,
-    currentTeamId
+export function ApplicationSidebar({ 
+  applications, 
+  activeTab, 
+  onTabChange, 
+  linkCounts,
+  currentTeamId 
 }: ApplicationSidebarProps) {
-    // ✅ Get team data from existing auth context
-    const { teams, getTeamRole } = useAuth();
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
-    const currentTeam = teams.find(team => team.id === currentTeamId);
-    const userRole = getTeamRole(currentTeamId);
+  const toggleSection = (section: string) => {
+    const newCollapsed = new Set(collapsedSections);
+    if (newCollapsed.has(section)) {
+      newCollapsed.delete(section);
+    } else {
+      newCollapsed.add(section);
+    }
+    setCollapsedSections(newCollapsed);
+  };
 
-    const sidebarItems = [
-        {
-            id: 'all',
-            label: 'All Links',
-            icon: List,
-            count: linkCounts.all || 0,
-        },
-        {
-            id: 'pinned',
-            label: 'Pinned',
-            icon: Pin,
-            count: linkCounts.pinned || 0,
-        },
-        {
-            id: 'common',
-            label: 'Common Links',
-            icon: Hash,
-            count: linkCounts.common || 0,
-        },
-    ];
+  // Updated quick filters with proper shadcn theming
+  const quickFilters = [
+    {
+      id: 'all',
+      label: 'All Links',
+      icon: Link2,
+      count: linkCounts.all || 0,
+      description: 'All accessible links'
+    },
+    {
+      id: 'pinned',
+      label: 'Pinned',
+      icon: Pin,
+      count: linkCounts.pinned || 0,
+      description: 'Your pinned links'
+    },
+    {
+      id: 'private',
+      label: 'Private Links',
+      icon: Lock,
+      count: linkCounts.private || 0,
+      description: 'Links only you can see'
+    },
+    {
+      id: 'team',
+      label: 'Team Links', 
+      icon: Users,
+      count: linkCounts.team || 0,
+      description: 'Public links shared with team'
+    },
+    {
+      id: 'analytics',
+      label: 'Analytics',
+      icon: BarChart3,
+      count: undefined,
+      description: 'Link usage analytics'
+    }
+  ];
 
-    return (
-        <div className="space-y-6">
-            {/* Team Context */}
-            <div className="space-y-2">
-                <div className="pl-6 space-y-1">
-                    <p className="text-sm font-medium truncate">{currentTeam?.name || 'Unknown Team'}</p>
-                    <div className="flex items-center space-x-2">
-                        <Badge variant={userRole === 'admin' ? 'default' : 'secondary'} className="text-xs">
-                            {userRole || 'user'}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                            {applications.length} app{applications.length !== 1 ? 's' : ''}
-                        </span>
-                    </div>
-                </div>
-            </div>
+  const statusFilters = [
+    {
+      id: 'archived',
+      label: 'Archived',
+      icon: Archive,
+      count: linkCounts.archived || 0,
+      description: 'Archived links'
+    },
+    {
+      id: 'broken',
+      label: 'Broken',
+      icon: AlertCircle,
+      count: linkCounts.broken || 0,
+      description: 'Links that need attention'
+    }
+  ];
 
-            <Separator />
+  return (
+    <div className="w-64 border-r border-border bg-background h-full flex flex-col">
+      <div className="p-4">
+        <h2 className="font-semibold text-lg mb-4 flex items-center gap-2 text-foreground">
+          <Building2 className="h-5 w-5 text-primary" />
+          Link Manager
+        </h2>
 
-            {/* Quick Filters */}
-            <div className="space-y-2">
-                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                    Quick Filters
-                </h3>
-                <div className="space-y-1">
-                    {sidebarItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = activeTab === item.id;
-
-                        return (
-                            <Button
-                                key={item.id}
-                                variant={isActive ? 'secondary' : 'ghost'}
-                                className="w-full justify-start"
-                                onClick={() => onTabChange(item.id)}
-                            >
-                                <Icon className="h-4 w-4 mr-3" />
-                                <span className="flex-1 text-left">{item.label}</span>
-                                {item.count > 0 && (
-                                    <Badge variant="secondary" className="ml-auto">
-                                        {item.count}
-                                    </Badge>
-                                )}
-                            </Button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Applications */}
-            <div className="space-y-2">
-                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                    Applications
-                </h3>
-                <ScrollArea className="h-96">
-                    <div className="space-y-1">
-                        {applications
-                            .filter(app => app.status === 'active')
-                            .sort((a, b) => a.applicationName.localeCompare(b.applicationName))
-                            .map((app) => {
-                                const isActive = activeTab === `app-${app.id}`;
-                                const count = linkCounts[app.id] || 0;
-
-                                return (
-                                    <Button
-                                        key={app.id}
-                                        variant={isActive ? 'secondary' : 'ghost'}
-                                        className="w-full justify-start text-left"
-                                        onClick={() => onTabChange(`app-${app.id}`)}
-                                    >
-                                        <Building2 className="h-4 w-4 mr-3 flex-shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-medium text-sm truncate">
-                                                {app.tla}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground truncate">
-                                                {app.applicationName}
-                                            </div>
-                                        </div>
-                                        {count > 0 && (
-                                            <Badge variant="secondary" className="ml-2 flex-shrink-0">
-                                                {count}
-                                            </Badge>
-                                        )}
-                                    </Button>
-                                );
-                            })}
-                    </div>
-                </ScrollArea>
-            </div>
-
-
-
-            <Separator />
-            <div>
+        {/* ✅ Updated Quick Filters Section with Shadcn Colors */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              Quick Filters
+            </h3>
+          </div>
+          
+          <div className="space-y-1">
+            {quickFilters.map((filter) => {
+              const Icon = filter.icon;
+              const isActive = activeTab === filter.id;
+              
+              return (
                 <Button
-                    variant={activeTab === 'analytics' ? 'secondary' : 'outline'} // ✅ Highlight when active
-                    className="w-full justify-start"
-                    onClick={() => onTabChange('analytics')}
+                  key={filter.id}
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={`w-full justify-start h-9 transition-colors ${
+                    isActive 
+                      ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
+                  onClick={() => onTabChange(filter.id)}
                 >
-                    <BarChart3 className="h-4 w-4 mr-3" />
-                    View Analytics
+                  <Icon className={`h-4 w-4 mr-2 ${
+                    filter.id === 'private' ? 'text-orange-500 dark:text-orange-400' : 
+                    filter.id === 'team' ? 'text-green-500 dark:text-green-400' : 
+                    filter.id === 'analytics' ? 'text-purple-500 dark:text-purple-400' :
+                    isActive ? 'text-secondary-foreground' : 'text-muted-foreground'
+                  }`} />
+                  <span className="flex-1 text-left">{filter.label}</span>
+                  {filter.count !== undefined && (
+                    <Badge 
+                      variant={isActive ? "default" : "secondary"} 
+                      className={`h-5 px-2 text-xs ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      {filter.count}
+                    </Badge>
+                  )}
                 </Button>
-            </div>
-
-
+              );
+            })}
+          </div>
         </div>
-    );
+
+        <Separator className="my-4" />
+
+        {/* ✅ Updated Status Filters with Shadcn Colors */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            Status
+          </h3>
+          
+          <div className="space-y-1">
+            {statusFilters.map((filter) => {
+              const Icon = filter.icon;
+              const isActive = activeTab === filter.id;
+              
+              return (
+                <Button
+                  key={filter.id}
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={`w-full justify-start h-9 transition-colors ${
+                    isActive 
+                      ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
+                  onClick={() => onTabChange(filter.id)}
+                >
+                  <Icon className={`h-4 w-4 mr-2 ${
+                    filter.id === 'broken' ? 'text-destructive' : 
+                    filter.id === 'archived' ? 'text-yellow-500 dark:text-yellow-400' :
+                    isActive ? 'text-secondary-foreground' : 'text-muted-foreground'
+                  }`} />
+                  <span className="flex-1 text-left">{filter.label}</span>
+                  <Badge 
+                    variant={isActive ? "default" : "secondary"} 
+                    className={`h-5 px-2 text-xs ${
+                      isActive 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {filter.count}
+                  </Badge>
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
+        {/* ✅ Updated Applications Section with Shadcn Colors */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              Applications
+            </h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => toggleSection('applications')}
+            >
+              <span className="text-xs">
+                {collapsedSections.has('applications') ? '+' : '−'}
+              </span>
+            </Button>
+          </div>
+          
+          {!collapsedSections.has('applications') && (
+            <ScrollArea className="h-64">
+              <div className="space-y-1 pr-2">
+                {applications
+                  .filter(app => app.status === 'active')
+                  .sort((a, b) => a.applicationName.localeCompare(b.applicationName))
+                  .map((app) => {
+                    const isActive = activeTab === `app-${app.id}`;
+                    const count = linkCounts[`app-${app.id}`] || 0;
+                    
+                    return (
+                      <Button
+                        key={app.id}
+                        variant={isActive ? "secondary" : "ghost"}
+                        className={`w-full justify-start h-9 text-left transition-colors ${
+                          isActive 
+                            ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' 
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                        }`}
+                        onClick={() => onTabChange(`app-${app.id}`)}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex flex-col items-start min-w-0 flex-1">
+                            <span className="font-medium text-sm truncate w-full">
+                              {app.tla}
+                            </span>
+                            <span className={`text-xs truncate w-full ${
+                              isActive ? 'text-secondary-foreground/70' : 'text-muted-foreground'
+                            }`}>
+                              {app.applicationName}
+                            </span>
+                          </div>
+                          <Badge 
+                            variant={isActive ? "default" : "outline"} 
+                            className={`h-5 px-2 text-xs ml-2 flex-shrink-0 ${
+                              isActive 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'bg-background text-muted-foreground border-border'
+                            }`}
+                          >
+                            {count}
+                          </Badge>
+                        </div>
+                      </Button>
+                    );
+                  })}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      </div>
+
+      {/* ✅ Updated Legend/Help Section with Shadcn Colors */}
+      <div className="mt-auto p-4 border-t border-border bg-muted/30">
+        <div className="text-xs text-muted-foreground space-y-2">
+          <div className="flex items-center gap-2">
+            <Lock className="h-3 w-3 text-orange-500 dark:text-orange-400" />
+            <span>Private - Only you can see</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Users className="h-3 w-3 text-green-500 dark:text-green-400" />
+            <span>Team - Shared with team</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Pin className="h-3 w-3 text-blue-500 dark:text-blue-400" />
+            <span>Pinned - Priority links</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
