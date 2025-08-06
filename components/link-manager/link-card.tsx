@@ -37,6 +37,7 @@ import { useAuth } from '@/app/(auth)/providers/AuthProvider';
 import { recordLinkAccess, deleteLink, toggleLinkPin } from '@/app/actions/link-manager/link-manager';
 import { toast } from 'sonner';
 import type { LinkWithApplications } from '@/app/types/link-manager';
+import { getAllFaviconsFromWebsite, testImageExists } from './lib/utils';
 
 interface LinkCardProps {
   link: LinkWithApplications;
@@ -67,6 +68,7 @@ export function LinkCard({
   const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
   const [faviconLoading, setFaviconLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
   
   const isAdmin = isTeamAdmin(teamId);
   const userEmail = user?.email;
@@ -143,7 +145,8 @@ export function LinkCard({
   useEffect(() => {
     const loadFavicon = async () => {
       if (!isInternal) {
-        setFaviconUrl(`https://www.google.com/s2/favicons?domain=${domain}&sz=16`);
+        // For external domains, use Google's service
+        setFaviconUrl(`https://www.google.com/s2/favicons?domain=${domain}&sz=32`);
         return;
       }
 
@@ -151,29 +154,35 @@ export function LinkCard({
       setIconError(false);
 
       try {
-        const faviconPaths = ['/favicon.ico', '/favicon.png'];
-        const domainOrigin = new URL(link.url).origin;
+        console.log('🔍 Fetching favicon for internal domain:', link.url);
         
-        for (const path of faviconPaths) {
-          try {
-            const faviconUrl = `${domainOrigin}${path}`;
-            const img = new Image();
-            img.onload = () => {
-              setFaviconUrl(faviconUrl);
-              setFaviconLoading(false);
-            };
-            img.onerror = () => {
-              // continue;
-            };
-            img.src = faviconUrl;
-            return;
-          } catch (error) {
-            continue;
+        // ✅ Use server action instead of API route
+        const favicons = await getAllFaviconsFromWebsite(link.url);
+        
+        if (favicons && favicons.length > 0) {
+          // Try each favicon URL until we find one that works
+          for (const favicon of favicons) {
+            try {
+              const imageExists = await testImageExists(favicon.url);
+              
+              if (imageExists) {
+                console.log('✅ Found working favicon:', favicon.url);
+                setFaviconUrl(favicon.url);
+                setFaviconLoading(false);
+                return;
+              }
+            } catch (error) {
+              console.log('❌ Favicon failed:', favicon.url, error);
+              continue;
+            }
           }
         }
         
+        console.log('❌ No working favicon found for:', link.url);
         setIconError(true);
+        
       } catch (error) {
+        console.error('💥 Error loading favicon:', error);
         setIconError(true);
       } finally {
         setFaviconLoading(false);
@@ -189,7 +198,7 @@ export function LinkCard({
     if (faviconLoading) {
       return (
         <div className={`flex items-center justify-center ${size} bg-muted animate-pulse rounded-md`}>
-          <div className="w-2 h-2 bg-muted-foreground/30 rounded"></div>
+          <div className="w-2 h-2 bg-muted-foreground/30 rounded animate-spin"></div>
         </div>
       );
     }
@@ -200,12 +209,19 @@ export function LinkCard({
           src={faviconUrl}
           alt=""
           className={`rounded-md ${size} object-cover`}
-          onError={() => setIconError(true)}
-          onLoad={() => setIconError(false)}
+          onError={() => {
+            console.log('❌ Favicon image failed to load:', faviconUrl);
+            setIconError(true);
+          }}
+          onLoad={() => {
+            console.log('✅ Favicon loaded successfully:', faviconUrl);
+            setIconError(false);
+          }}
         />
       );
     }
 
+    // Fallback for when favicon fails or is unavailable
     if (isInternal) {
       return (
         <div className={`flex items-center justify-center ${size} text-xs bg-gradient-to-br from-blue-500 to-purple-600 text-white dark:from-blue-600 dark:to-purple-700 rounded-md`}>
