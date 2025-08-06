@@ -1,114 +1,101 @@
-import { notFound } from "next/navigation";
-import { requireAuth } from "@/app/(auth)/lib/auth";
-import { db } from "@/db";
-import { teams, applications } from "@/db/schema/teams";
-import { eq } from "drizzle-orm";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import ApplicationsList from "@/components/teams/applications-list";
-import TeamSettings from '@/components/teams/register/TeamSettings';
-import NewApplicationDialog from "@/components/teams/applications/NewApplicationDialog";
+// 
 
-async function getTeamData(teamId: string) {
-  const user = await requireAuth();
-  
-  // Check if user has access to this team
-  const hasTeamAccess = user.teams?.some(team => team.teamId === teamId);
-  if (!hasTeamAccess) {
-    return null;
-  }
 
-  // First fetch team details
-  const team = await db.select().from(teams).where(eq(teams.id, teamId)).execute();
-  if (!team.length) {
-    return null;
-  }
+// app/teams/[teamId]/page.tsx
+import { Suspense } from 'react';
+import { notFound } from 'next/navigation';
+import { getTeamDetails } from '@/app/actions/teams/teams';
+import { TeamDashboard } from '@/components/dashboard/teams-dashboard';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
-  // Then fetch applications for this team
-  const teamApplications = await db.select().from(applications).where(eq(applications.teamId, teamId)).execute();
-
-  // Combine the data
-  return {
-    ...team[0],
-    applications: teamApplications
+interface TeamPageProps {
+  params: {
+    teamId: string;
   };
 }
 
-interface PageProps {
-  params: Promise<{ teamId: string }>;
+function TeamLoadingSkeleton() {
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      {/* Header Skeleton */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <Skeleton className="h-10 w-32" />
+      </div>
+
+      {/* Stats Cards Skeleton */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-6">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Content Skeleton */}
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="h-64">
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-export default async function TeamDashboard({ params }: PageProps) {
-  // Await the params object
-  const { teamId } = await params;
+export default async function TeamPage({ params }: TeamPageProps) {
+  const result = await getTeamDetails(params.teamId);
 
-  // Validate teamId parameter
-  if (!teamId) {
-    return notFound();
-  }
-
-  const teamDetails = await getTeamData(teamId);
-  const user = await requireAuth();
-  const isAdmin = user.teams?.some(team => team.teamId === teamId && team.role === 'admin');
-
-  if (!teamDetails) {
-    return notFound();
+  if (!result.success) {
+    notFound();
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">{teamDetails.teamName}</h1>
-          <p className="text-muted-foreground">Manage your team's applications and settings</p>
-        </div>
-      </div>
-
-      <Tabs defaultValue="applications" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="applications">Applications</TabsTrigger>
-          <TabsTrigger value="settings">Team Settings</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="applications" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-semibold">Applications</h2>
-              <p className="text-sm text-muted-foreground">
-                Manage your team's applications and their configurations
-              </p>
-            </div>
-            <NewApplicationDialog teamId={teamId} />
-          </div>
-          
-          <ApplicationsList applications={teamDetails.applications} />
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <TeamSettings teamDetails={teamDetails} isAdmin={isAdmin} teamId={teamId} />
-        </TabsContent>
-
-        <TabsContent value="members">
-          <Card>
-            <CardHeader>
-              <CardTitle>Team Members</CardTitle>
-              <CardDescription>
-                View and manage team members
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Members of this group have access to the portal. To get access, raise an IIQ request to get access to the team.
-              </p>
-              {/* Placeholder for members list */}
-              <ul className="list-disc pl-6 text-sm text-muted-foreground">
-                <li>Member management coming soon...</li>
-              </ul>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+    <div className="container mx-auto py-6">
+      <Suspense fallback={<TeamLoadingSkeleton />}>
+        <TeamDashboard 
+          team={result.data.team}
+          applications={result.data.applications}
+          userRole={result.data.userRole}
+        />
+      </Suspense>
     </div>
   );
-} 
+}
+
+// Generate metadata for the page
+export async function generateMetadata({ params }: TeamPageProps) {
+  const result = await getTeamDetails(params.teamId);
+  
+  if (!result.success) {
+    return {
+      title: 'Team Not Found',
+    };
+  }
+
+  return {
+    title: `${result.data.team.teamName} | Team Dashboard`,
+    description: `Manage applications and settings for ${result.data.team.teamName}`,
+  };
+}

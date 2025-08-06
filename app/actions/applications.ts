@@ -228,7 +228,7 @@ export async function getTeamApplications(teamId: string) {
       .select({
         id: applications.id,
         applicationName: applications.applicationName,
-        carId: applications.carId,
+        assetId: applications.assetId,
         tla: applications.tla,
         tier: applications.tier,
         status: applications.status,
